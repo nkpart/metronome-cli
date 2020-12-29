@@ -27,8 +27,10 @@ import Data.IORef (readIORef, IORef, newIORef)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Brick.BChan ( newBChan, writeBChan )
 import Brick.Widgets.List (renderList, list)
-import Q (Q(Always))
+import Q (Q(Sometimes, Always))
 import Paths_metronome_cli
+import Text.Printf
+import Brick.Widgets.Border (border)
 
 data S =
   S {
@@ -36,9 +38,10 @@ data S =
       , snap :: Metronome
     }
 
-data AppEvent = 
+newtype AppEvent = 
   Beep Int
 
+clickTrackFile :: IO FilePath
 clickTrackFile = getDataFileName "157-click1.wav"
 
 uiMain :: IO ()
@@ -132,9 +135,10 @@ snapAndContinue s = do
 drawUI :: S -> [Widget ()]
 drawUI s = 
   [ 
-        txt ("" <> fromString (show (metronomeBpm $ snap s))) 
-    <=> txt "---------------"
-    <=> renderList renderItem True (metronomeBeats $ snap s)
+        border (txt ("BPM: " <> fromString (show (metronomeBpm $ snap s))))
+    <=> border (renderList renderItem True (metronomeBeats $ snap s))
   ]
-    where renderItem _s (beat, thisClick) = (if thisClick then txt "> " else txt "  ") <+> txt (fromString . show $ beat)
+    where renderItem _s (b, thisClick) = (if thisClick then txt "> " else txt "  ") <+> txt (showBeat b)
+          showBeat (Always b) = fromString . show $ b
+          showBeat (Sometimes f b) = fromString $ show b <> " ?? " <> printf "%2.2f" f
 
