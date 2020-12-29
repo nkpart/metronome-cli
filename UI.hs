@@ -17,7 +17,6 @@ import Graphics.Vty
 import MyLib
     (BeatSound(Accent), setPlayed, changeProb, removeBeat, addBeat, setAccent,  Metronome(metronomeBeats, Metronome, metronomeBpm),
       startMetronome,
-      accent,
       beat,
       modifyBpm )
 import Sound.ProteaAudio
@@ -28,8 +27,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Brick.BChan ( newBChan, writeBChan )
 import Brick.Widgets.List (renderList, list)
 import Q (Q(Sometimes, Always))
-import Paths_metronome_cli
-import Text.Printf
+import Paths_metronome_cli ( getDataFileName )
+import Text.Printf ( printf )
 import Brick.Widgets.Border (border)
 
 data S =
