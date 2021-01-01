@@ -24,6 +24,4 @@ runQ g action = \case
                    Always t -> action (Just t)
                    Sometimes threshold t -> do
                       p <- uniform g
-                      if p < threshold
-                         then action (Just t)
-                         else action Nothing
+                      action $ if p < threshold then Just t else Nothing

@@ -4,7 +4,6 @@ module UI where
 import Brick
     ((<+>), (<=>), customMain,  attrMap,
       continue,
-      defaultMain,
       halt,
       txt,
       App(App, appDraw, appChooseCursor, appHandleEvent, appStartEvent,
