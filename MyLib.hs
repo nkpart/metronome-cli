@@ -8,7 +8,7 @@ import Control.Concurrent.Async (cancel,  async )
 import System.Random.MWC ( createSystemRandom )
 import Q ((++=),  Q(Always), runQ )
 import Control.Applicative (Alternative(empty))
-import Data.IORef (modifyIORef, IORef, readIORef)
+import Data.IORef (IORef, readIORef)
 import Control.Lens
 import Brick.Widgets.List (listRemove, listReverse, listElementsL, List)
 
@@ -17,41 +17,35 @@ data Metronome = Metronome  {
    , metronomeBeats :: List () (Q BeatSound, Bool)
    }  deriving Show
 
-modifyBpm :: (Int -> Int) -> IORef Metronome -> IO ()
-modifyBpm f ref =
-   modifyIORef ref (\met -> met { metronomeBpm = f (metronomeBpm met)})
+modifyBpm :: (Int -> Int) -> Metronome -> Metronome
+modifyBpm f met = met { metronomeBpm = f (metronomeBpm met)}
 
-setAccent :: Int -> IORef Metronome -> IO ()
-setAccent n ref = 
-   modifyIORef ref (\met -> met { 
+setAccent :: Int -> Metronome -> Metronome
+setAccent n met = met { 
       metronomeBeats = metronomeBeats met & listElementsL . ix n . _1 . mapped %~ toggleAccent
-    })
+       }
 
-changeProb :: Int -> Float -> IORef Metronome -> IO ()
-changeProb n prob ref =
-   modifyIORef ref (\met -> met { 
+changeProb :: Int -> Float -> Metronome -> Metronome
+changeProb n prob met = met { 
       metronomeBeats = metronomeBeats met & listElementsL . ix n . _1 %~ (++= prob)
-    })
-
-addBeat :: IORef Metronome -> IO ()
-addBeat ref =
-   modifyIORef ref (\met -> met { 
+                                }
+addBeat :: Metronome -> Metronome
+addBeat met = met { 
       metronomeBeats = metronomeBeats met & listElementsL %~ (<> [(Always Beat, False)])
-    })
+    }
 
-removeBeat :: IORef Metronome -> IO ()
-removeBeat ref =
-   modifyIORef ref (\met -> met { 
+removeBeat :: Metronome -> Metronome
+removeBeat met = met { 
       metronomeBeats = metronomeBeats met & listReverse . listRemove 0 . listReverse 
-    })
+               }
 
-setPlayed :: Int -> IORef Metronome -> IO ()
-setPlayed n ref = 
-   modifyIORef ref (\met -> met { 
+setPlayed :: Int -> Metronome -> Metronome
+setPlayed n met = met { 
       metronomeBeats = metronomeBeats met & listElementsL . traverse . _2 .~ False
                                           & listElementsL . ix n . _2 .~ True
-    })
+               }
 
+toggleAccent :: BeatSound -> BeatSound
 toggleAccent Accent = Beat
 toggleAccent Beat = Accent
 

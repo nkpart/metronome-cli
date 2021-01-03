@@ -21,20 +21,14 @@ import MyLib
 import Sound.ProteaAudio
     ( finishAudio, initAudio, loaderAvailable, sampleFromFile ) 
 import Data.String (IsString(fromString))
-import Data.IORef (readIORef, IORef, newIORef)
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.IORef (writeIORef, newIORef)
 import Brick.BChan ( newBChan, writeBChan )
 import Brick.Widgets.List (renderList, list)
 import Q (Q(Sometimes, Always))
 import Paths_metronome_cli ( getDataFileName )
 import Text.Printf ( printf )
 import Brick.Widgets.Border (border)
-
-data S =
-  S {
-        ref :: IORef Metronome
-      , snap :: Metronome
-    }
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 newtype AppEvent = 
   Beep Int
@@ -44,15 +38,18 @@ clickTrackFile = getDataFileName "157-click1.wav"
 
 uiMain :: IO ()
 uiMain = do
+  let initialState = Metronome 114 (list () [(Always Accent, False), (beat, False), (beat, False), (beat, False)] 10)
+  rr <- newIORef initialState 
   let app = App {
               appDraw = drawUI,
               appChooseCursor = \_s _locs -> Nothing,
-              appHandleEvent = handleEvent,
+              appHandleEvent = \s' e -> do
+                  let (f, s) = handleEvent s' e
+                  liftIO $ writeIORef rr s
+                  f s,
               appStartEvent = pure,
               appAttrMap = \_s -> attrMap defAttr mempty
              }
-      initialState = Metronome 114 (list () [(Always Accent, False), (beat, False), (beat, False), (beat, False)] 10)
-  rr <- newIORef initialState 
   True <- initAudio 100 48000 512
   True <- loaderAvailable "wav"
   clickTrack <- flip sampleFromFile 1.0 =<< clickTrackFile 
@@ -61,34 +58,31 @@ uiMain = do
   let buildVty = mkVty defaultConfig
   initialVty <- buildVty
   finalState <- customMain initialVty buildVty
-                    (Just eventChan) app (S rr initialState)
+                    (Just eventChan) app initialState
   finishAudio
-  print (snap finalState)
+  print finalState
 
-handleEvent :: S -> BrickEvent () AppEvent -> EventM () (Next S)
+(~>) :: a -> b -> (a, b)
+a ~> b = (a, b)
+
+handleEvent :: Metronome -> BrickEvent n1 AppEvent -> (s -> EventM n2 (Next s), Metronome)
 handleEvent s e = case e of
    (VtyEvent e2) -> case e2 of
       -- Quit
-      EvKey k [m] | k == KChar 'c' && m == MCtrl -> halt s
-      EvKey k _ | k == KChar 'q' -> halt s
+      EvKey k [m] | k == KChar 'c' && m == MCtrl -> halt ~> s
+      EvKey k _ | k == KChar 'q' -> halt ~> s
       -- Metronome modifications 
-      EvKey k _ ->
+      EvKey k _ -> continue ~>
         case lookup k actions of
-          Nothing -> continue s
-          Just f -> do _ <- liftIO $ f (ref s)
-                       snapAndContinue s
-      _ -> continue s
-   --
-   AppEvent (Beep n) ->  do
-     _ <- liftIO $ setPlayed n (ref s)
-     snapAndContinue s
-                           
-   _ -> continue s
+          Nothing -> s
+          Just f -> f s
+      _ -> continue ~> s
+   AppEvent (Beep n) ->
+     continue ~> setPlayed n s
+   _ -> continue ~> s
 
-actions :: [(Key, IORef Metronome -> IO ())]
+actions :: [(Key, Metronome -> Metronome)]
 actions = 
-  let a ~> b = (a,b)
-  in
   [
     -- Change bpm
     KChar '.' ~> modifyBpm succ
@@ -125,16 +119,11 @@ actions =
   , KChar 'm' ~> changeProb 6 (-0.1)
   ]
 
-snapAndContinue :: S -> EventM n (Next S)
-snapAndContinue s = do
-           snapped <- liftIO $ readIORef (ref s) 
-           continue (S (ref s) snapped)
-
-drawUI :: S -> [Widget ()]
+drawUI :: Metronome -> [Widget ()]
 drawUI s = 
   [ 
-        border (txt ("BPM: " <> fromString (show (metronomeBpm $ snap s))))
-    <=> border (renderList renderItem True (metronomeBeats $ snap s))
+        border (txt ("BPM: " <> fromString (show (metronomeBpm s))))
+    <=> border (renderList renderItem True (metronomeBeats s))
   ]
     where renderItem _s (b, thisClick) = (if thisClick then txt "> " else txt "  ") <+> txt (showBeat b)
           showBeat (Always b) = fromString . show $ b
