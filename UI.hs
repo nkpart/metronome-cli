@@ -2,7 +2,7 @@
 module UI where
 
 import Brick
-    (AttrName, Padding(Max), padRight, str, handleEventLensed, (<+>), (<=>), customMain,  attrMap,
+    (clickable, AttrName, str, handleEventLensed, (<+>), (<=>), customMain,  attrMap,
       continue,
       halt,
       txt,
@@ -10,9 +10,9 @@ import Brick
           appAttrMap),
       EventM,
       Widget,
-      BrickEvent(AppEvent, VtyEvent), Next )
+      BrickEvent(MouseUp, MouseDown, AppEvent, VtyEvent), Next )
 import Graphics.Vty
-    (defaultConfig, mkVty,  Event(EvKey), Key(KChar), Modifier(MCtrl) )
+    (Button(BLeft), Output(supportsMode, setMode), Mode(Mouse), defaultConfig, mkVty, outputIface,   Event(EvKey), Key(KChar), Modifier(MCtrl) )
 import Sound.ProteaAudio
     ( finishAudio, initAudio, loaderAvailable, sampleFromFile ) 
 import Data.IORef (writeIORef, newIORef)
@@ -31,6 +31,7 @@ import Brick.Util
 import Data.Maybe (fromJust)
 import Data.Char (digitToInt)
 import Brick.Widgets.Center (hCenter)
+import Control.Monad (when)
 
 newtype AppEvent = 
   Beep Int
@@ -43,10 +44,12 @@ loadDigits =
   let loadDigit = \i -> fmap (i, ) . readFile =<< getDataFileName ("digits/" <> show i)
    in traverse loadDigit [0..9]
 
+data Name = 
+      MinusBox Int | PlusBox Int | U deriving (Eq, Show, Ord)
 
 uiMain :: IO ()
 uiMain = do
-  let initialState = Metronome 114 (list () [(Always Accent, False), (beat, False), (beat, False), (beat, False)] 10)
+  let initialState = Metronome 114 (list U [(Always Accent, False), (beat, False), (beat, False), (beat, False)] 10)
   rr <- newIORef initialState 
 
   digits <- loadDigits
@@ -60,18 +63,23 @@ uiMain = do
                       (VtyEvent e') -> handleEventLensed s' metronomeBeats handleListEvent e'
                       _ -> pure s'
                   let (f, s) = handleEvent s'' e
-                  liftIO $ writeIORef rr s
+                  liftIO (writeIORef rr s)
                   f s,
               appStartEvent = pure,
               appAttrMap = \_s -> attrMap defAttr styles
              }
   True <- initAudio 100 48000 512
   True <- loaderAvailable "wav"
+
   clickTrack <- flip sampleFromFile 1.0 =<< clickTrackFile 
   eventChan <- Brick.BChan.newBChan 10
   _stop <- startMetronome clickTrack rr (writeBChan eventChan . Beep)
   let buildVty = mkVty defaultConfig
   initialVty <- buildVty
+  let output = outputIface initialVty
+  when (supportsMode output Mouse) $ do
+    setMode output Mouse True
+
   finalState <- customMain initialVty buildVty
                     (Just eventChan) app initialState
   finishAudio
@@ -80,9 +88,12 @@ uiMain = do
 (~>) :: a -> b -> (a, b)
 a ~> b = (a, b)
 
-handleEvent :: Metronome -> BrickEvent n1 AppEvent -> (s -> EventM n2 (Next s), Metronome)
+handleEvent :: Metronome n1 -> BrickEvent Name AppEvent -> (s -> EventM n2 (Next s), Metronome n1)
 handleEvent s e = case e of
-   (VtyEvent e2) -> case e2 of
+   MouseUp (MinusBox n) (Just BLeft) _ -> continue ~> modifyBpm (\x -> x - n) s
+   MouseUp (PlusBox n) (Just BLeft) _ -> continue ~> modifyBpm (+ n) s
+   VtyEvent e2 -> case e2 of
+
       -- Quit
       EvKey k [m] | k == KChar 'c' && m == MCtrl -> halt ~> s
       EvKey k _ | k == KChar 'q' -> halt ~> s
@@ -96,7 +107,7 @@ handleEvent s e = case e of
      continue ~> setPlayed n s
    _ -> continue ~> s
 
-actions :: [(Key, Metronome -> Metronome)]
+actions :: [(Key, Metronome n -> Metronome n)]
 actions = 
   [
     -- Change bpm
@@ -111,10 +122,19 @@ actions =
   , KChar ']' ~> changeProbSelected 0.1
   ]
 
-drawUI :: [(Int, String)] -> Metronome -> [Widget ()]
+drawUI :: [(Int, String)] -> Metronome Name -> [Widget Name]
 drawUI digits s = 
   [ 
         border (hCenter $ displayBpm digits (view metronomeBpm s))
+    <=> (
+       border (clickable (MinusBox 5) $ hCenter $ str " -5 ") 
+       <+> 
+       border (clickable (MinusBox 1) $ hCenter $ str " - ")
+       <+> 
+       border (clickable (PlusBox 1) $ hCenter $ str " + ")
+       <+> 
+       border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
+        )
     <=> border (renderList renderItem True (view metronomeBeats s))
   ]
     where renderItem _s (b, thisClick) = hCenter $

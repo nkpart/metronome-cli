@@ -13,7 +13,7 @@ import Control.Lens
 import Brick.Widgets.List (listElementsL)
 import Metronome
 
-startMetronome :: Sample -> IORef Metronome -> (Int -> IO ()) -> IO (IO ())
+startMetronome :: Sample -> IORef (Metronome n) -> (Int -> IO ()) -> IO (IO ())
 startMetronome clickTrack ref beeping = do
      g <- createSystemRandom
      xs <-
@@ -27,7 +27,7 @@ startMetronome clickTrack ref beeping = do
               pure ()
      pure $ cancel xs
 
-loopBeatsRef :: IORef Metronome -> (Int -> Q BeatSound -> IO ()) -> IO ()
+loopBeatsRef :: IORef (Metronome n) -> (Int -> Q BeatSound -> IO ()) -> IO ()
 loopBeatsRef ref f = go 0
   where go n =
              do xs <- view metronomeBeats <$> readIORef ref
