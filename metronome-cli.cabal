@@ -5,11 +5,22 @@ author:              Nick Partridge
 maintainer:          nkpart@gmail.com
 extra-source-files:  CHANGELOG.md
 
-Data-Files: 157-click1.wav
+Data-Files: 
+  157-click1.wav
+  digits/1
+  digits/2
+  digits/3
+  digits/4
+  digits/5
+  digits/6
+  digits/7
+  digits/8
+  digits/9
+  digits/0
 
 library
   ghc-options:  -O2 -Wall
-  exposed-modules:     MyLib, Q, UI, Paths_metronome_cli
+  exposed-modules:     Metronome, MyLib, Q, UI, Paths_metronome_cli
   build-depends:       base >=4.13.0.0
                      , proteaaudio
                      , async
@@ -19,6 +30,7 @@ library
                      , brick
                      , lens
   default-language:    Haskell2010
+  frameworks: CoreAudio
 
 executable metronome-cli
   ghc-options:  -O2 -Wall -threaded
