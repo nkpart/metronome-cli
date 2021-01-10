@@ -17,7 +17,7 @@ import Sound.ProteaAudio
     ( finishAudio, initAudio, loaderAvailable, sampleFromFile ) 
 import Data.IORef (writeIORef, newIORef)
 import Brick.BChan ( newBChan, writeBChan )
-import Brick.Widgets.List (listSelectedAttr, handleListEvent, renderList, list)
+import Brick.Widgets.List (renderListWithIndex, listSelectedAttr, handleListEvent, renderList, list)
 import Q (Q(Sometimes, Always))
 import Paths_metronome_cli ( getDataFileName )
 import Text.Printf ( printf )
@@ -45,7 +45,7 @@ loadDigits =
    in traverse loadDigit [0..9]
 
 data Name = 
-      MinusBox Int | PlusBox Int | U deriving (Eq, Show, Ord)
+      MinusBox Int | PlusBox Int | Beat Int | U deriving (Eq, Show, Ord)
 
 uiMain :: IO ()
 uiMain = do
@@ -92,6 +92,7 @@ handleEvent :: Metronome n1 -> BrickEvent Name AppEvent -> (s -> EventM n2 (Next
 handleEvent s e = case e of
    MouseUp (MinusBox n) (Just BLeft) _ -> continue ~> modifyBpm (\x -> x - n) s
    MouseUp (PlusBox n) (Just BLeft) _ -> continue ~> modifyBpm (+ n) s
+   MouseUp (UI.Beat n) (Just BLeft) _ -> continue ~> setAccent n s
    VtyEvent e2 -> case e2 of
 
       -- Quit
@@ -135,9 +136,9 @@ drawUI digits s =
        <+> 
        border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
         )
-    <=> border (renderList renderItem True (view metronomeBeats s))
+    <=> border (renderListWithIndex renderItem True (view metronomeBeats s))
   ]
-    where renderItem _s (b, thisClick) = hCenter $
+    where renderItem idx _s (b, thisClick) = clickable (UI.Beat idx) $ hCenter $
             str " " <=>
             -- ((if thisClick then txt "> " else txt "  ") <+> padRight Max (str (showBeat b))) <=>
             ((if thisClick then txt "> " else txt "") <+> str (showBeat b) <+> (if thisClick then txt " <" else txt "")) <=>

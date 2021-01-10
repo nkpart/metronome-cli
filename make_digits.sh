@@ -1,5 +1,8 @@
 mkdir -p digits
 
+# Preview fonts
+# ls /nix/store/p5zrn0kvb1vw91bb06jzmm2d4dczy7d7-toilet-0.3/share/figlet | xargs -I {} sh -c 'echo {}; toilet -f {} -W 514'
+
 function digit() {
   toilet -f mono9 -W
  # | head -n -2
