@@ -29,6 +29,8 @@ library
                      , vty
                      , brick
                      , lens
+                     , directory
+                     , filepath
   default-language:    Haskell2010
   frameworks: CoreAudio
 

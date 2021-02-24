@@ -10,7 +10,7 @@ data Metronome n = Metronome {
    , _metronomeBeats :: List n (Q BeatSound, Bool)
    }  deriving Show
 
-data BeatSound = Accent | Beat deriving (Eq, Show)
+data BeatSound = Accent | Beat deriving (Eq, Show, Read)
 
 metronomeBpm :: Lens' (Metronome n) Int
 metronomeBpm = lens _metronomeBpm (\m b -> m { _metronomeBpm = b})

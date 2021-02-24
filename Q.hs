@@ -8,7 +8,7 @@ import System.Random.MWC
 
 data Q a =
    Always a | Sometimes Float a
-   deriving (Eq, Show, Functor, Traversable, Foldable)
+   deriving (Eq, Show, Functor, Traversable, Foldable, Read)
 
 (??) :: Q a -> Float -> Q a
 Always b ?? f = Sometimes f b

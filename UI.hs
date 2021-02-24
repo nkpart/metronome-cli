@@ -30,11 +30,12 @@ import Brick
     (<=>),
   )
 
+import System.FilePath
 import Brick.BChan (newBChan, writeBChan)
 import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
-import Brick.Widgets.List (handleListEvent, list, listSelectedAttr, renderListWithIndex)
+import Brick.Widgets.List (handleListEvent, list, listSelectedAttr, renderListWithIndex, listElements)
 import Control.Lens (view)
 import Control.Monad (when)
 
@@ -78,6 +79,10 @@ import Sound.ProteaAudio
     sampleFromFile,
   )
 import Text.Printf (printf)
+import System.Directory (createDirectoryIfMissing, doesFileExist, getUserDocumentsDirectory)
+import GHC.Exts (fromList)
+import Data.Foldable (toList)
+import Data.Functor ((<&>))
 
 newtype AppEvent
   = Beep Int
@@ -90,6 +95,17 @@ loadDigits =
   let loadDigit = \i -> fmap (i,) . readFile =<< getDataFileName ("digits/" <> show i)
    in traverse loadDigit [0 .. 9]
 
+configDirectory :: IO FilePath
+configDirectory = getUserDocumentsDirectory <&> (</> ".config/metronome-cli")
+
+configFile :: FilePath
+configFile = "settings"
+
+data Conf = Conf {
+   _confBpm :: Int,
+   _confBeats :: [(Q BeatSound, Bool)]
+ } deriving (Eq, Show, Read)
+
 data Name
   = MinusBox Int
   | PlusBox Int
@@ -99,7 +115,17 @@ data Name
 
 uiMain :: IO ()
 uiMain = do
-  let initialState = Metronome 114 (list U [(Always Accent, False), (beat, False), (beat, False), (beat, False)] 10)
+  resolvedConfigDir <- configDirectory
+  createDirectoryIfMissing True resolvedConfigDir
+
+  conf <- do
+    hasConf <- doesFileExist (resolvedConfigDir </> configFile)
+    if hasConf
+       then read <$> readFile (resolvedConfigDir </> configFile)
+       else pure (Conf 114 [(Always Accent, False), (beat, False), (beat, False), (beat, False)])
+
+  let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10)
+  
   rr <- newIORef initialState
 
   digits <- loadDigits
@@ -119,6 +145,7 @@ uiMain = do
             appStartEvent = pure,
             appAttrMap = \_s -> attrMap defAttr styles
           }
+
   True <- initAudio 100 48000 512
   True <- loaderAvailable "wav"
 
@@ -138,7 +165,9 @@ uiMain = do
       (Just eventChan)
       app
       initialState
+
   finishAudio
+  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (toList $ listElements $ view metronomeBeats finalState))
   print finalState
 
 (~>) :: a -> b -> (a, b)
