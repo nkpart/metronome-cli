@@ -1,7 +1,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 module MyLib where
 
-import Sound.ProteaAudio (Sound, Sample,  soundPlay )
 import Control.Monad (forever )
 import Control.Concurrent ( threadDelay )
 import Control.Concurrent.Async (cancel,  async )
@@ -13,7 +12,9 @@ import Control.Lens
 import Brick.Widgets.List (listElementsL)
 import Metronome
 
-startMetronome :: Sample -> IORef (Metronome n) -> (Int -> IO ()) -> IO (IO ())
+import qualified SDL.Mixer as Mixer
+
+startMetronome :: Mixer.Chunk -> IORef (Metronome n) -> (Int -> IO ()) -> IO (IO ())
 startMetronome clickTrack ref beeping = do
      g <- createSystemRandom
      xs <-
@@ -36,13 +37,7 @@ loopBeatsRef ref f = go 0
                            go (succ n)
                    else pure ()
 
-play :: Sample -> BeatSound -> IO Sound
-play clickTrack bs = 
-       let vol = case bs of
-                   Accent -> 2.0
-                   Beat -> 0.5
-           pitchFactor = case bs of
-                           Accent -> 2.5
-                           Beat -> 1.0
-           leftRightSkew = 0
-       in soundPlay clickTrack vol vol leftRightSkew pitchFactor 
+play :: Mixer.Chunk -> BeatSound -> IO ()
+play clickTrack _bs = 
+   Mixer.play clickTrack
+       -- soundPlay clickTrack vol vol leftRightSkew pitchFactor 

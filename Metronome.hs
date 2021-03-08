@@ -60,4 +60,3 @@ accent = Always Accent
 beat :: Q BeatSound
 beat = Always Beat
 
-

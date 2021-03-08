@@ -38,17 +38,14 @@ import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.List (handleListEvent, list, listSelectedAttr, renderListWithIndex, listElements)
 import Control.Lens (view)
 import Control.Monad (when)
+import Actions
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Char (digitToInt)
 import Data.IORef (newIORef, writeIORef)
 import Data.Maybe (fromJust)
 import Graphics.Vty
-  ( Button (BLeft),
-    Event (EvKey),
-    Key (KChar),
-    Mode (Mouse),
-    Modifier (MCtrl),
+  ( Mode (Mouse),
     Output (setMode, supportsMode),
     defaultConfig,
     mkVty,
@@ -58,42 +55,24 @@ import Graphics.Vty.Attributes (Attr, blue, defAttr)
 import Metronome
   ( BeatSound (Accent),
     Metronome (Metronome),
-    addBeat,
     beat,
-    changeProbSelected,
     metronomeBeats,
     metronomeBpm,
-    modifyBpm,
-    removeBeat,
-    setAccent,
-    setPlayed,
-    toggleAccentOnSelected,
   )
 import MyLib (startMetronome)
 import Paths_metronome_cli (getDataFileName)
 import Q (Q (Always, Sometimes))
-import Sound.ProteaAudio
-  ( finishAudio,
-    initAudio,
-    loaderAvailable,
-    sampleFromFile,
-  )
 import Text.Printf (printf)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getUserDocumentsDirectory)
 import GHC.Exts (fromList)
 import Data.Foldable (toList)
 import Data.Functor ((<&>))
-
-newtype AppEvent
-  = Beep Int
+import qualified SDL
+import qualified SDL.Mixer as Mixer
+import qualified Digits
 
 clickTrackFile :: IO FilePath
 clickTrackFile = getDataFileName "157-click1.wav"
-
-loadDigits :: IO [(Int, String)]
-loadDigits =
-  let loadDigit = \i -> fmap (i,) . readFile =<< getDataFileName ("digits/" <> show i)
-   in traverse loadDigit [0 .. 9]
 
 configDirectory :: IO FilePath
 configDirectory = getUserDocumentsDirectory <&> (</> ".config/metronome-cli")
@@ -105,13 +84,6 @@ data Conf = Conf {
    _confBpm :: Int,
    _confBeats :: [(Q BeatSound, Bool)]
  } deriving (Eq, Show, Read)
-
-data Name
-  = MinusBox Int
-  | PlusBox Int
-  | Beat Int
-  | U
-  deriving (Eq, Show, Ord)
 
 uiMain :: IO ()
 uiMain = do
@@ -128,7 +100,7 @@ uiMain = do
   
   rr <- newIORef initialState
 
-  digits <- loadDigits
+  digits <- Digits.loadDigits
 
   let app =
         App
@@ -146,10 +118,12 @@ uiMain = do
             appAttrMap = \_s -> attrMap defAttr styles
           }
 
-  True <- initAudio 100 48000 512
-  True <- loaderAvailable "wav"
+  SDL.initialize ([SDL.InitAudio] :: [SDL.InitFlag])
+  Mixer.initialize ([Mixer.InitMP3]  :: [ Mixer.InitFlag ])
 
-  clickTrack <- flip sampleFromFile 1.0 =<< clickTrackFile
+  Mixer.openAudio Mixer.defaultAudio 256
+
+  clickTrack <- Mixer.load =<< clickTrackFile
   eventChan <- Brick.BChan.newBChan 10
   _stop <- startMetronome clickTrack rr (writeBChan eventChan . Beep)
   let buildVty = mkVty defaultConfig
@@ -166,46 +140,13 @@ uiMain = do
       app
       initialState
 
-  finishAudio
+  Mixer.free clickTrack
+  Mixer.closeAudio
+  Mixer.quit
+  SDL.quit
+
   writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (toList $ listElements $ view metronomeBeats finalState))
   print finalState
-
-(~>) :: a -> b -> (a, b)
-a ~> b = (a, b)
-
-handleEvent :: Metronome n1 -> BrickEvent Name AppEvent -> (s -> EventM n2 (Next s), Metronome n1)
-handleEvent s e = case e of
-  MouseUp (MinusBox n) (Just BLeft) _ -> continue ~> modifyBpm (\x -> x - n) s
-  MouseUp (PlusBox n) (Just BLeft) _ -> continue ~> modifyBpm (+ n) s
-  MouseUp (UI.Beat n) (Just BLeft) _ -> continue ~> setAccent n s
-  VtyEvent e2 -> case e2 of
-    -- Quit
-    EvKey k [m] | k == KChar 'c' && m == MCtrl -> halt ~> s
-    EvKey k _ | k == KChar 'q' -> halt ~> s
-    -- Metronome modifications
-    EvKey k _ ->
-      continue
-        ~> case lookup k actions of
-          Nothing -> s
-          Just f -> f s
-    _ -> continue ~> s
-  AppEvent (Beep n) ->
-    continue ~> setPlayed n s
-  _ -> continue ~> s
-
-actions :: [(Key, Metronome n -> Metronome n)]
-actions =
-  [ -- Change bpm
-    KChar '.' ~> modifyBpm succ,
-    KChar ',' ~> modifyBpm pred,
-    KChar '>' ~> modifyBpm (\x -> x + 5),
-    KChar '<' ~> modifyBpm (\x -> x - 5),
-    KChar '=' ~> addBeat,
-    KChar '-' ~> removeBeat,
-    KChar 'x' ~> toggleAccentOnSelected,
-    KChar '[' ~> changeProbSelected (-0.1),
-    KChar ']' ~> changeProbSelected 0.1
-  ]
 
 drawUI :: [(Int, String)] -> Metronome Name -> [Widget Name]
 drawUI digits s =
@@ -219,7 +160,7 @@ drawUI digits s =
   ]
   where
     renderItem idx _s (b, thisClick) =
-      clickable (UI.Beat idx) $
+      clickable (Actions.Beat idx) $
         hCenter $
           str " "
             <=> ((if thisClick then txt "> " else txt "") <+> str (showBeat b) <+> (if thisClick then txt " <" else txt ""))
@@ -229,11 +170,8 @@ drawUI digits s =
 
 displayBpm :: [(Int, String)] -> Int -> Widget n
 displayBpm digits num =
-  let thisDigits = fromJust . flip lookup digits <$> digitsFor num
+  let thisDigits = Digits.render digits num
    in foldl1 (<+>) $ fmap str thisDigits
-
-digitsFor :: Int -> [Int]
-digitsFor = map digitToInt . show
 
 -- Styles
 
