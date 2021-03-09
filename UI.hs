@@ -58,6 +58,7 @@ import qualified SDL
 import qualified SDL.Mixer as Mixer
 import qualified Digits
 import Config
+import Brick.Main (continue, halt)
 
 clickTrackFile :: IO FilePath
 clickTrackFile = getDataFileName "157-click1.wav"
@@ -72,13 +73,12 @@ uiMain = do
           { appDraw = drawUI digits,
             appChooseCursor = \_s _locs -> Nothing,
             appHandleEvent = \s' e -> do
-              s'' <-
-                case e of
-                  (VtyEvent e') -> handleEventLensed s' metronomeBeats handleListEvent e'
-                  _ -> pure s'
-              let (f, s) = handleEvent s'' e
+              s <- handleEvent s' e
               liftIO (writeIORef rr s)
-              f s,
+              if _metronomeShouldQuit s
+                 then halt s
+                 else continue s
+          ,
             appStartEvent = pure,
             appAttrMap = \_s -> attrMap defAttr styles
           }

@@ -29,7 +29,7 @@ readConfig = do
     conf <- if hasConf
        then read <$> readFile (resolvedConfigDir </> configFile)
        else pure (Conf 114 [(Always Accent, False), (beat, False), (beat, False), (beat, False)])
-    let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10)
+    let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10) False
     pure initialState
 
 writeConfig :: Metronome n -> IO ()

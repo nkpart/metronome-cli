@@ -8,6 +8,7 @@ import Q ((++=), Q(Always))
 data Metronome n = Metronome {
      _metronomeBpm :: Int
    , _metronomeBeats :: List n (Q BeatSound, Bool)
+   , _metronomeShouldQuit :: Bool
    }  deriving Show
 
 data BeatSound = Accent | Beat deriving (Eq, Show, Read)
@@ -17,6 +18,9 @@ metronomeBpm = lens _metronomeBpm (\m b -> m { _metronomeBpm = b})
 
 metronomeBeats :: Lens' (Metronome n) (List n (Q BeatSound, Bool))
 metronomeBeats = lens _metronomeBeats (\m b -> m { _metronomeBeats = b})
+
+metronomeShouldQuit :: Lens' (Metronome n) Bool
+metronomeShouldQuit = lens _metronomeShouldQuit (\m b -> m { _metronomeShouldQuit = b})
 
 modifyBpm :: (Int -> Int) -> Metronome n -> Metronome n
 modifyBpm = over metronomeBpm
@@ -49,6 +53,9 @@ setPlayed :: Int -> Metronome n -> Metronome n
 setPlayed n = 
   (metronomeBeats . listElementsL . ix n . _2 .~ True) .
    (metronomeBeats . listElementsL . traverse . _2 .~ False)
+
+setShouldQuit :: Metronome n -> Metronome n
+setShouldQuit = set metronomeShouldQuit True
 
 toggleAccent :: BeatSound -> BeatSound
 toggleAccent Accent = Beat

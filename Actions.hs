@@ -8,19 +8,16 @@ import Metronome
       setAccent,
       setPlayed,
       toggleAccentOnSelected,
-      Metronome )
-import Brick
-    ( EventM,
-      continue,
-      halt,
-      BrickEvent(AppEvent, MouseUp, VtyEvent),
-      Next )
+      Metronome, setShouldQuit, metronomeBeats )
 import Graphics.Vty
   ( Button (BLeft),
     Event (EvKey),
     Key (KChar),
     Modifier (MCtrl)
   )
+import Brick (EventM, BrickEvent(AppEvent, MouseUp, VtyEvent))
+import Brick.Types (handleEventLensed)
+import Brick.Widgets.List (handleListEvent)
 
 newtype AppEvent
   = Beep Int
@@ -32,25 +29,26 @@ data Name
   | U
   deriving (Eq, Show, Ord)
 
-handleEvent :: Metronome n1 -> BrickEvent Name AppEvent -> (s -> EventM n2 (Next s), Metronome n1)
+handleEvent :: Ord n => Metronome n -> BrickEvent Name AppEvent -> EventM n (Metronome n)
 handleEvent s e = case e of
-  MouseUp (MinusBox n) (Just BLeft) _ -> continue ~> modifyBpm (\x -> x - n) s
-  MouseUp (PlusBox n) (Just BLeft) _ -> continue ~> modifyBpm (+ n) s
-  MouseUp (Actions.Beat n) (Just BLeft) _ -> continue ~> setAccent n s
-  VtyEvent e2 -> case e2 of
-    -- Quit
-    EvKey k [m] | k == KChar 'c' && m == MCtrl -> halt ~> s
-    EvKey k _ | k == KChar 'q' -> halt ~> s
-    -- Metronome modifications
-    EvKey k _ ->
-      continue
-        ~> case lookup k actions of
-          Nothing -> s
-          Just f -> f s
-    _ -> continue ~> s
-  AppEvent (Beep n) ->
-    continue ~> setPlayed n s
-  _ -> continue ~> s
+  MouseUp (MinusBox n) (Just BLeft) _ -> pure $ modifyBpm (\x -> x - n) s
+  MouseUp (PlusBox n) (Just BLeft) _ -> pure $ modifyBpm (+ n) s
+  MouseUp (Actions.Beat n) (Just BLeft) _ -> pure $ setAccent n s
+  VtyEvent e' ->
+    do s'' <- handleEventLensed s metronomeBeats handleListEvent e'
+       case e' of
+        -- Quit
+        EvKey k [m] | k == KChar 'c' && m == MCtrl -> pure $ setShouldQuit s''
+        EvKey k _ | k == KChar 'q' -> pure $ setShouldQuit s''
+        -- Metronome modifications
+        EvKey k _ -> pure $ 
+          case lookup k actions of
+              Nothing -> s''
+              Just f -> f s''
+        _ -> pure s''
+  AppEvent (Beep n) -> pure $
+    setPlayed n s
+  _ -> pure s
 
 actions :: [(Key, Metronome n -> Metronome n)]
 actions =
@@ -65,7 +63,6 @@ actions =
     KChar '[' ~> changeProbSelected (-0.1),
     KChar ']' ~> changeProbSelected 0.1
   ]
-
 
 (~>) :: a -> b -> (a, b)
 a ~> b = (a, b)
