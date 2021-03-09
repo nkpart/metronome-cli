@@ -14,12 +14,10 @@ import Brick
         appStartEvent
       ),
     AttrName,
-    BrickEvent (VtyEvent),
     Widget,
     attrMap,
     clickable,
     customMain,
-    handleEventLensed,
     str,
     txt,
     (<+>),
@@ -30,7 +28,7 @@ import Brick.BChan (newBChan, writeBChan)
 import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
-import Brick.Widgets.List (handleListEvent, listSelectedAttr, renderListWithIndex)
+import Brick.Widgets.List (listSelectedAttr, renderListWithIndex)
 import Control.Lens (view)
 import Control.Monad (when)
 import Actions
@@ -86,8 +84,8 @@ uiMain = do
   SDL.initialize ([SDL.InitAudio] :: [SDL.InitFlag])
   Mixer.initialize ([Mixer.InitMP3]  :: [ Mixer.InitFlag ])
   Mixer.openAudio Mixer.defaultAudio 256
-
   clickTrack <- Mixer.load =<< clickTrackFile
+
   eventChan <- Brick.BChan.newBChan 10
   _stop <- startMetronome clickTrack rr (writeBChan eventChan . Beep)
   let buildVty = mkVty defaultConfig
@@ -124,7 +122,7 @@ drawUI digits s =
     plus1 = border (clickable (PlusBox 1) $ hCenter $ str " + ")
     plus5 = border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
     renderBeat idx _s (b, thisClick) =
-      clickable (Actions.Beat idx) $
+      clickable (ClickBeat idx) $
         hCenter $
           str " "
             <=> ((if thisClick then txt "> " else txt "") <+> str (showBeat b) <+> (if thisClick then txt " <" else txt ""))

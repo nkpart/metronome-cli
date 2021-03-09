@@ -40,4 +40,3 @@ loopBeatsRef ref f = go 0
 play :: Mixer.Chunk -> BeatSound -> IO ()
 play clickTrack _bs = 
    Mixer.play clickTrack
-       -- soundPlay clickTrack vol vol leftRightSkew pitchFactor 
