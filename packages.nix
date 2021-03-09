@@ -1,4 +1,4 @@
-{}:
+{ ... }:
 let 
   pkgs = import <nixpkgs> {};
   hl = pkgs.haskell.lib;

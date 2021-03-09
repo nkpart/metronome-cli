@@ -20,7 +20,7 @@ Data-Files:
 
 library
   ghc-options:  -O2 -Wall
-  exposed-modules:     Metronome, MyLib, Q, UI, Paths_metronome_cli, Actions, Digits
+  exposed-modules:     Metronome, MyLib, Q, UI, Paths_metronome_cli, Actions, Digits, Config
   build-depends:       base >=4.13.0.0
                      , sdl2-mixer
                      , sdl2

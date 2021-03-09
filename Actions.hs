@@ -32,7 +32,6 @@ data Name
   | U
   deriving (Eq, Show, Ord)
 
-
 handleEvent :: Metronome n1 -> BrickEvent Name AppEvent -> (s -> EventM n2 (Next s), Metronome n1)
 handleEvent s e = case e of
   MouseUp (MinusBox n) (Just BLeft) _ -> continue ~> modifyBpm (\x -> x - n) s

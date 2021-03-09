@@ -14,15 +14,11 @@ import Brick
         appStartEvent
       ),
     AttrName,
-    BrickEvent (AppEvent, MouseUp, VtyEvent),
-    EventM,
-    Next,
+    BrickEvent (VtyEvent),
     Widget,
     attrMap,
     clickable,
-    continue,
     customMain,
-    halt,
     handleEventLensed,
     str,
     txt,
@@ -30,20 +26,17 @@ import Brick
     (<=>),
   )
 
-import System.FilePath
 import Brick.BChan (newBChan, writeBChan)
 import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
-import Brick.Widgets.List (handleListEvent, list, listSelectedAttr, renderListWithIndex, listElements)
+import Brick.Widgets.List (handleListEvent, listSelectedAttr, renderListWithIndex)
 import Control.Lens (view)
 import Control.Monad (when)
 import Actions
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Data.Char (digitToInt)
 import Data.IORef (newIORef, writeIORef)
-import Data.Maybe (fromJust)
 import Graphics.Vty
   ( Mode (Mouse),
     Output (setMode, supportsMode),
@@ -53,9 +46,7 @@ import Graphics.Vty
   )
 import Graphics.Vty.Attributes (Attr, blue, defAttr)
 import Metronome
-  ( BeatSound (Accent),
-    Metronome (Metronome),
-    beat,
+  ( Metronome (..),
     metronomeBeats,
     metronomeBpm,
   )
@@ -63,45 +54,19 @@ import MyLib (startMetronome)
 import Paths_metronome_cli (getDataFileName)
 import Q (Q (Always, Sometimes))
 import Text.Printf (printf)
-import System.Directory (createDirectoryIfMissing, doesFileExist, getUserDocumentsDirectory)
-import GHC.Exts (fromList)
-import Data.Foldable (toList)
-import Data.Functor ((<&>))
 import qualified SDL
 import qualified SDL.Mixer as Mixer
 import qualified Digits
+import Config
 
 clickTrackFile :: IO FilePath
 clickTrackFile = getDataFileName "157-click1.wav"
 
-configDirectory :: IO FilePath
-configDirectory = getUserDocumentsDirectory <&> (</> ".config/metronome-cli")
-
-configFile :: FilePath
-configFile = "settings"
-
-data Conf = Conf {
-   _confBpm :: Int,
-   _confBeats :: [(Q BeatSound, Bool)]
- } deriving (Eq, Show, Read)
-
 uiMain :: IO ()
 uiMain = do
-  resolvedConfigDir <- configDirectory
-  createDirectoryIfMissing True resolvedConfigDir
-
-  conf <- do
-    hasConf <- doesFileExist (resolvedConfigDir </> configFile)
-    if hasConf
-       then read <$> readFile (resolvedConfigDir </> configFile)
-       else pure (Conf 114 [(Always Accent, False), (beat, False), (beat, False), (beat, False)])
-
-  let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10)
-  
+  initialState <- readConfig
   rr <- newIORef initialState
-
   digits <- Digits.loadDigits
-
   let app =
         App
           { appDraw = drawUI digits,
@@ -120,7 +85,6 @@ uiMain = do
 
   SDL.initialize ([SDL.InitAudio] :: [SDL.InitFlag])
   Mixer.initialize ([Mixer.InitMP3]  :: [ Mixer.InitFlag ])
-
   Mixer.openAudio Mixer.defaultAudio 256
 
   clickTrack <- Mixer.load =<< clickTrackFile
@@ -145,21 +109,21 @@ uiMain = do
   Mixer.quit
   SDL.quit
 
-  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (toList $ listElements $ view metronomeBeats finalState))
-  print finalState
+  writeConfig finalState
 
 drawUI :: [(Int, String)] -> Metronome Name -> [Widget Name]
 drawUI digits s =
-  [ border (hCenter $ displayBpm digits (view metronomeBpm s))
-      <=> ( border (clickable (MinusBox 5) $ hCenter $ str " -5 ")
-              <+> border (clickable (MinusBox 1) $ hCenter $ str " - ")
-              <+> border (clickable (PlusBox 1) $ hCenter $ str " + ")
-              <+> border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
-          )
-      <=> border (renderListWithIndex renderItem True (view metronomeBeats s))
+  [       bpmDisplay
+      <=> (minus5 <+> minus1 <+> plus1 <+> plus5)
+      <=> border (renderListWithIndex renderBeat True (view metronomeBeats s))
   ]
   where
-    renderItem idx _s (b, thisClick) =
+    bpmDisplay = border (hCenter $ displayBpm digits (view metronomeBpm s))
+    minus5 = border (clickable (MinusBox 5) $ hCenter $ str " -5 ")
+    minus1 = border (clickable (MinusBox 1) $ hCenter $ str " - ")
+    plus1 = border (clickable (PlusBox 1) $ hCenter $ str " + ")
+    plus5 = border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
+    renderBeat idx _s (b, thisClick) =
       clickable (Actions.Beat idx) $
         hCenter $
           str " "
@@ -169,9 +133,8 @@ drawUI digits s =
     showBeat (Sometimes f b) = show b <> " ?? " <> printf "%2.2f" f
 
 displayBpm :: [(Int, String)] -> Int -> Widget n
-displayBpm digits num =
-  let thisDigits = Digits.render digits num
-   in foldl1 (<+>) $ fmap str thisDigits
+displayBpm digits =
+   foldl1 (<+>) . fmap str . Digits.render digits
 
 -- Styles
 
