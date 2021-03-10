@@ -4,7 +4,7 @@ let
   hl = pkgs.haskell.lib;
   hp = pkgs.haskell.packages.ghc8104.override {
     overrides = self: super: {
-      metronome_cli = self.callCabal2nix "metronome-cli" ./. { };
+      metronome_cli = hl.addBuildDepends (self.callCabal2nix "metronome-cli" ./. { }) [pkgs.darwin.apple_sdk.frameworks.CoreAudio];
     };
   };
 
