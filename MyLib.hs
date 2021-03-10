@@ -8,9 +8,9 @@ import System.Random.MWC ( createSystemRandom )
 import Q (Q, runQ )
 import Control.Applicative (Alternative(empty))
 import Data.IORef (IORef, readIORef)
-import Control.Lens
 import Brick.Widgets.List (listElementsL)
 import Metronome
+import Lens.Micro.Platform
 
 import qualified SDL.Mixer as Mixer
 

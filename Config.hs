@@ -5,7 +5,7 @@ import Metronome
 import System.Directory
 import System.FilePath ((</>))
 import Data.Functor ((<&>))
-import Control.Lens (view)
+import Lens.Micro.Platform (view)
 import Data.Foldable (toList)
 import GHC.Exts (fromList)
 import Actions

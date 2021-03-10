@@ -3,23 +3,25 @@
 {-# LANGUAGE LambdaCase #-}
 module Q where
 
--- Q values can be executed sometimes
 import System.Random.MWC
 
+-- Q values can be extracted sometimes
 data Q a =
    Always a | Sometimes Float a
    deriving (Eq, Show, Functor, Traversable, Foldable, Read)
 
-(??) :: Q a -> Float -> Q a
-Always b ?? f = Sometimes f b
-Sometimes _ b ?? f = Sometimes f b
+setChance :: Float -> Q a -> Q a
+setChance f = \case
+   Always a -> Sometimes f a
+   Sometimes _ a -> Sometimes f a
 
-(++=) :: Q a -> Float -> Q a
-Always b ++= f = Sometimes 1.0 b ++= f
-Sometimes p b ++= f | f + p >= 1.0 = Always b
-                    | f + p <= 0 = Sometimes 0 b
-                    | otherwise = Sometimes (f+p) b
+adjustChance :: Float -> Q a -> Q a
+adjustChance f (Always b) = adjustChance f (Sometimes 1.0 b)
+adjustChance f (Sometimes p b) | f + p >= 1.0 = Always b
+                               | f + p <= 0 = Sometimes 0 b
+                               | otherwise = Sometimes (f+p) b
 
+runQ :: Gen _ -> (Maybe a -> IO b) -> Q a -> IO b
 runQ g action = \case
                    Always t -> action (Just t)
                    Sometimes threshold t -> do

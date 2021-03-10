@@ -1,9 +1,9 @@
 {-# language OverloadedLists #-}
 module Metronome where
 
-import Control.Lens
+import Lens.Micro.Platform
 import Brick.Widgets.List (GenericList(listSelected), listRemove, listReverse, listElementsL, List)
-import Q ((++=), Q(Always))
+import Q (adjustChance, Q(Always))
 
 data Metronome n = Metronome {
      _metronomeBpm :: Int
@@ -35,7 +35,7 @@ toggleAccentOnSelected m =
         Nothing -> m
 
 changeProb :: Int -> Float -> Metronome n -> Metronome n
-changeProb n prob = metronomeBeats . listElementsL . ix n . _1 %~ (++= prob)
+changeProb n prob = metronomeBeats . listElementsL . ix n . _1 %~ adjustChance prob
 
 changeProbSelected :: Float -> Metronome n -> Metronome n
 changeProbSelected prob m = 

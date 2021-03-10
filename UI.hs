@@ -29,7 +29,7 @@ import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.List (listSelectedAttr, renderListWithIndex)
-import Control.Lens (view)
+import Lens.Micro.Platform (view)
 import Control.Monad (when)
 import Actions
 

@@ -29,7 +29,7 @@ library
                      , random
                      , vty
                      , brick
-                     , lens
+                     , microlens-platform
                      , directory
                      , filepath
   default-language:    Haskell2010

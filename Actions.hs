@@ -1,4 +1,4 @@
-module Actions where
+module Actions (Name(..), handleEvent, AppEvent(..)) where
 
 import Metronome
     ( addBeat,
@@ -35,31 +35,24 @@ handleEvent s e = case e of
   MouseUp (PlusBox n) (Just BLeft) _ -> pure $ modifyBpm (+ n) s
   MouseUp (ClickBeat n) (Just BLeft) _ -> pure $ setAccent n s
   VtyEvent e' ->
-    do s'' <- handleEventLensed s metronomeBeats handleListEvent e'
-       case e' of
+    do -- Process list keys
+       s'' <- handleEventLensed s metronomeBeats handleListEvent e'
+       -- Process other keys 
+       pure $ case e' of
         -- Quit
-        EvKey k [m] | k == KChar 'c' && m == MCtrl -> pure $ setShouldQuit s''
-        EvKey k _ | k == KChar 'q' -> pure $ setShouldQuit s''
+        EvKey (KChar 'c') [MCtrl] -> setShouldQuit s''
+        EvKey (KChar 'q') _ -> setShouldQuit s''
         -- Metronome modifications
-        EvKey k _ | Just f <- lookup k actions -> pure $ f s''
-        _ -> pure s''
+        EvKey (KChar '.') _ -> modifyBpm succ s''
+        EvKey (KChar ',') _ -> modifyBpm pred s''
+        EvKey (KChar '>') _ -> modifyBpm (\x -> x + 5) s''
+        EvKey (KChar '<') _ -> modifyBpm (\x -> x - 5) s''
+        EvKey (KChar '=') _ -> addBeat s''
+        EvKey (KChar '-') _ -> removeBeat s''
+        EvKey (KChar 'x') _ -> toggleAccentOnSelected s''
+        EvKey (KChar '[') _ -> changeProbSelected (-0.1) s''
+        EvKey (KChar ']') _ -> changeProbSelected 0.1 s''
+        _ -> s''
   AppEvent (Beep n) -> pure $
     setPlayed n s
   _ -> pure s
-
-actions :: [(Key, Metronome n -> Metronome n)]
-actions =
-  [ -- Change bpm
-    KChar '.' ~> modifyBpm succ,
-    KChar ',' ~> modifyBpm pred,
-    KChar '>' ~> modifyBpm (\x -> x + 5),
-    KChar '<' ~> modifyBpm (\x -> x - 5),
-    KChar '=' ~> addBeat,
-    KChar '-' ~> removeBeat,
-    KChar 'x' ~> toggleAccentOnSelected,
-    KChar '[' ~> changeProbSelected (-0.1),
-    KChar ']' ~> changeProbSelected 0.1
-  ]
-
-(~>) :: a -> b -> (a, b)
-a ~> b = (a, b)
