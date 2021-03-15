@@ -52,7 +52,7 @@ library
   default-language:    Haskell2010
   frameworks: CoreAudio
 
-executable metronome-cli
+executable metro
   ghc-options:  -O2 -Wall -threaded
   main-is:             Main.hs
   hs-source-dirs:      app

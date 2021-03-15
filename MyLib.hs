@@ -46,7 +46,6 @@ quitPlayback (Playback beatTrack accentTrack) = do
 window :: Int
 window = 10 -- What should this be, guessing 10ms is okay
 
-
 startMetronome :: Traversable n => Playback -> IORef (Metronome n) -> ((Q BeatSoundNoCompound, Int) -> IO ()) -> IO (IO ())
 startMetronome pb ref beeping = do
      g <- createSystemRandom
@@ -107,7 +106,7 @@ beatTimes m =
       beatTimes' = fmap (fromIntegral . (* beatMillis)) [0 .. (numBeats - 1)]
    in if numBeats == 0 
          then error "No beats?" 
-         else zip (fmap fst beats) beatTimes' >>= expandCompound beatMillis
+         else zip beats beatTimes' >>= expandCompound beatMillis
 
 expandCompound :: Int -> (Q BeatSound, Int) -> [(Q BeatSoundNoCompound, Int)]
 expandCompound beatMillis (q,bt) = case qOption q of

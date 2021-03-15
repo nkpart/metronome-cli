@@ -14,14 +14,20 @@ import Q (adjustChance, Q(Always))
 import Data.Vector as V
 import Data.List.NonEmpty
 import Data.Void (Void, absurd)
+import Data.Functor.Compose (Compose(..))
 
 data Metronome f = Metronome {
      _metronomeBpm :: Int
-   , _metronomeBeats :: f (Q BeatSound, Bool) -- Bool is isPlayed
+   , _metronomeBeats :: f (Q BeatSound) 
    , _metronomeShouldQuit :: Bool
    }
 
-deriving instance (Show (f (Q BeatSound, Bool))) => Show (Metronome f)
+type WithBool = (,) Bool
+
+-- Bool is isPlayed
+type UIMetronome n = Metronome (Compose (GenericList n Vector) WithBool)
+
+deriving instance (Show (f (Q BeatSound))) => Show (Metronome f)
 
 data B x = Accent | Beat | Rest | E x deriving (Eq, Show, Read)
 type BeatSoundNoCompound = B Void 
@@ -30,7 +36,7 @@ type BeatSound = B (NonEmpty BeatSoundNoCompound)
 metronomeBpm :: Lens' (Metronome n) Int
 metronomeBpm = lens _metronomeBpm (\m b -> m { _metronomeBpm = b})
 
-metronomeBeats :: Lens' (Metronome f) (f (Q BeatSound, Bool))
+metronomeBeats :: Lens' (Metronome f) (f (Q BeatSound))
 metronomeBeats = lens _metronomeBeats (\m b -> m { _metronomeBeats = b})
 
 metronomeShouldQuit :: Lens' (Metronome n) Bool
@@ -39,37 +45,40 @@ metronomeShouldQuit = lens _metronomeShouldQuit (\m b -> m { _metronomeShouldQui
 modifyBpm :: (Int -> Int) -> Metronome n -> Metronome n
 modifyBpm = over metronomeBpm
 
-setAccent :: Int -> Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
-setAccent n = metronomeBeats . ix n . _1 . mapped %~ toggleAccent
+setAccent :: Int -> UIMetronome n -> UIMetronome n
+setAccent n = metronomeBeats . compose . ix n . _2 . mapped %~ toggleAccent
 
-toggleAccentOnSelected :: Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
+toggleAccentOnSelected :: UIMetronome n -> UIMetronome n
 toggleAccentOnSelected m =
-   do case listSelected (m^.metronomeBeats) of
+   do case listSelected (getCompose $ m^.metronomeBeats) of
         Just idx -> setAccent idx m
         Nothing -> m
 
-changeProb :: Int -> Float -> Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
-changeProb n prob = metronomeBeats . ix n . _1 %~ adjustChance prob
+changeProb :: Int -> Float -> UIMetronome n -> UIMetronome n
+changeProb n prob = metronomeBeats . compose . ix n . _2 %~ adjustChance prob
 
-changeProbSelected :: Float -> Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
+changeProbSelected :: Float -> UIMetronome n -> UIMetronome n
 changeProbSelected prob m = 
-   do case listSelected (m^.metronomeBeats) of
+   do case listSelected (m^.metronomeBeats . compose) of
         Just idx -> changeProb idx prob m
         Nothing -> m
 
-addBeat :: Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
-addBeat = metronomeBeats . listElementsL %~ (<> [(Always Beat, False)])
+addBeat :: UIMetronome n -> UIMetronome n
+addBeat = metronomeBeats . compose . listElementsL %~ (<> [(False, Always Beat)])
 
-removeBeat :: Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
-removeBeat = metronomeBeats %~ listReverse . listRemove 0 . listReverse 
+removeBeat :: UIMetronome n -> UIMetronome n
+removeBeat = metronomeBeats . compose %~ listReverse . listRemove 0 . listReverse 
 
-setPlayed :: Int -> Metronome (GenericList n Vector) -> Metronome (GenericList n Vector)
+setPlayed :: Int -> UIMetronome n -> UIMetronome n
 setPlayed n = 
-  (metronomeBeats . listElementsL . ix n . _2 .~ True) .
-   (metronomeBeats . listElementsL . traverse . _2 .~ False)
+  (metronomeBeats . compose . listElementsL . ix n . _1 .~ True) .
+   (metronomeBeats . compose . listElementsL . traverse . _1 .~ False)
 
 setShouldQuit :: Metronome n -> Metronome n
 setShouldQuit = set metronomeShouldQuit True
+
+compose :: Lens' (Compose f g a) (f (g a))
+compose = lens getCompose (\(Compose _) b -> Compose b)
 
 toggleAccent :: BeatSound -> BeatSound
 toggleAccent Accent = Beat

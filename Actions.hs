@@ -1,5 +1,8 @@
 module Actions (Name(..), handleEvent, AppEvent(..)) where
 
+
+
+
 import Metronome
     ( addBeat,
       changeProbSelected,
@@ -8,7 +11,7 @@ import Metronome
       setAccent,
       setPlayed,
       toggleAccentOnSelected,
-      Metronome, setShouldQuit, metronomeBeats )
+      setShouldQuit, metronomeBeats, UIMetronome, compose )
 import Graphics.Vty
   ( Button (BLeft),
     Event (EvKey),
@@ -17,8 +20,7 @@ import Graphics.Vty
   )
 import Brick (EventM, BrickEvent(AppEvent, MouseUp, VtyEvent))
 import Brick.Types (handleEventLensed)
-import Brick.Widgets.List (handleListEvent, GenericList)
-import qualified Data.Vector as V
+import Brick.Widgets.List (handleListEvent)
 
 newtype AppEvent
   = Beep Int
@@ -30,14 +32,14 @@ data Name
   | U
   deriving (Eq, Show, Ord)
 
-handleEvent :: Ord n => Metronome (GenericList n V.Vector) -> BrickEvent Name AppEvent -> EventM n (Metronome (GenericList n V.Vector))
+handleEvent :: Ord n => UIMetronome n -> BrickEvent Name AppEvent -> EventM n (UIMetronome n)
 handleEvent s e = case e of
   MouseUp (MinusBox n) (Just BLeft) _ -> pure $ modifyBpm (\x -> x - n) s
   MouseUp (PlusBox n) (Just BLeft) _ -> pure $ modifyBpm (+ n) s
   MouseUp (ClickBeat n) (Just BLeft) _ -> pure $ setAccent n s
   VtyEvent e' ->
     do -- Process list keys
-       s'' <- handleEventLensed s metronomeBeats handleListEvent e'
+       s'' <- handleEventLensed s (metronomeBeats . compose) handleListEvent e'
        -- Process other keys 
        pure $ case e' of
         -- Quit

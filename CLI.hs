@@ -45,16 +45,15 @@ patternToMetronome :: MonadFail m => Int -> String -> m (Metronome [])
 patternToMetronome bpm s =
   Metronome bpm <$> traverse handleWord (words s) <*> pure False
 
-toBeat :: [BeatSoundNoCompound] -> Q.Q BeatSound
-toBeat [Accent] = Q.Always Accent
-toBeat [Beat] = Q.Always Beat
-toBeat (x:xs) = Q.Always (E $ x :| xs)
-toBeat [] = error "empty pattern word"
+toBeat :: MonadFail m => [BeatSoundNoCompound] -> m (Q.Q BeatSound)
+toBeat [Accent] = pure $ Q.Always Accent
+toBeat [Beat] = pure $ Q.Always Beat
+toBeat (x:xs) = pure $ Q.Always (E $ x :| xs)
+toBeat [] = fail "empty pattern word"
 
-handleWord :: MonadFail m => [Char] -> m (Q.Q BeatSound, Bool)
+handleWord :: MonadFail m => [Char] -> m (Q.Q BeatSound)
 handleWord xs = do
-  beats <- traverse charToBeat xs
-  pure (toBeat beats, False)
+  toBeat =<< traverse charToBeat xs
 
 charToBeat :: MonadFail m => Char -> m BeatSoundNoCompound
 charToBeat 'A' = pure Accent

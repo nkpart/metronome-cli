@@ -28,7 +28,7 @@ import Brick.BChan (newBChan, writeBChan)
 import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
-import Brick.Widgets.List (listSelectedAttr, renderListWithIndex, GenericList)
+import Brick.Widgets.List (listSelectedAttr, renderListWithIndex)
 import Lens.Micro.Platform (view)
 import Control.Monad (when)
 import Actions
@@ -46,7 +46,7 @@ import Graphics.Vty.Attributes (Attr, blue, defAttr)
 import Metronome
   ( Metronome (..),
     metronomeBeats,
-    metronomeBpm,
+    metronomeBpm, compose, UIMetronome
   )
 import MyLib (startMetronome, initPlayback, quitPlayback)
 import Q (Q (Always, Sometimes))
@@ -54,7 +54,6 @@ import Text.Printf (printf)
 import qualified Digits
 import Config
 import Brick.Main (continue, halt)
-import qualified Data.Vector as V
 
 uiMain :: IO ()
 uiMain = do
@@ -101,11 +100,11 @@ uiMain = do
   quitPlayback playback
 
 
-drawUI :: [(Int, String)] -> Metronome (GenericList Name V.Vector) -> [Widget Name]
+drawUI :: [(Int, String)] -> UIMetronome Name -> [Widget Name]
 drawUI digits s =
   [       bpmDisplay
       <=> (minus5 <+> minus1 <+> plus1 <+> plus5)
-      <=> border (renderListWithIndex renderBeat True (view metronomeBeats s))
+      <=> border (renderListWithIndex renderBeat True (view (metronomeBeats . compose) s))
   ]
   where
     bpmDisplay = border (hCenter $ displayBpm digits (view metronomeBpm s))
@@ -113,7 +112,7 @@ drawUI digits s =
     minus1 = border (clickable (MinusBox 1) $ hCenter $ str " - ")
     plus1 = border (clickable (PlusBox 1) $ hCenter $ str " + ")
     plus5 = border (clickable (PlusBox 5) $ hCenter $ str " +5 ")
-    renderBeat idx _s (b, thisClick) =
+    renderBeat idx _s (thisClick, b) =
       clickable (ClickBeat idx) $
         hCenter $
           str " "

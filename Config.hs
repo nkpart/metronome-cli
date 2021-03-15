@@ -8,9 +8,9 @@ import Data.Functor ((<&>))
 import Lens.Micro.Platform (view)
 import GHC.Exts (fromList)
 import Actions
-import Brick.Widgets.List (list, GenericList)
-import qualified Data.Vector as V
+import Brick.Widgets.List (list)
 import Lens.Micro ((^..))
+import Data.Functor.Compose (Compose(Compose))
 
 configDirectory :: IO FilePath
 configDirectory = getUserDocumentsDirectory <&> (</> ".config/metronome-cli")
@@ -20,21 +20,21 @@ configFile = "settings"
 
 data Conf = Conf {
    _confBpm :: Int,
-   _confBeats :: [(Q BeatSound, Bool)]
+   _confBeats :: [(Bool, Q BeatSound)]
  } deriving (Eq, Show, Read)
 
-readConfig :: IO (Metronome (GenericList Name V.Vector))
+readConfig :: IO (UIMetronome Name)
 readConfig = do
     resolvedConfigDir <- configDirectory
     hasConf <- doesFileExist (resolvedConfigDir </> configFile)
     conf <- if hasConf
        then read <$> readFile (resolvedConfigDir </> configFile)
-       else pure (Conf 114 [(Always Accent, False), (beat, False), (beat, False), (beat, False)])
-    let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10) False
+       else pure (Conf 114 [(False, Always Accent), (False, beat), (False, beat), (False, beat)])
+    let initialState = Metronome (_confBpm conf) (Compose $ list U (fromList $ _confBeats conf) 10) False
     pure initialState
 
-writeConfig :: Traversable f => Metronome f -> IO ()
+writeConfig :: UIMetronome Name -> IO ()
 writeConfig finalState = do
   resolvedConfigDir <- configDirectory
   createDirectoryIfMissing True resolvedConfigDir
-  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (finalState ^.. metronomeBeats . traverse))
+  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (finalState ^.. metronomeBeats . compose . traverse))
