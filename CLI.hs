@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module CLI where
 
 import Options.Applicative
@@ -24,23 +25,9 @@ cliArgs =
 
 args :: Parser Args
 args = subparser (
-           command "tui" (info (pure TUI) (progDesc "Terminal UI"))
+              command "tui" (info (pure TUI) (progDesc "Terminal UI"))
            <> command "cli" (info cliArgs (progDesc "Supply a pattern"))
-                 )
-      -- <$> strOption
-      --     ( long "hello"
-      --    <> metavar "TARGET"
-      --    <> help "Target for the greeting" )
-      -- <*> switch
-      --     ( long "quiet"
-      --    <> short 'q'
-      --    <> help "Whether to be quiet" )
-      -- <*> option auto
-      --     ( long "enthusiasm"
-      --    <> help "How enthusiastically to greet"
-      --    <> showDefault
-      --    <> value 1
-      --    <> metavar "INT" )
+           )
 
 argsMain :: IO ()
 argsMain = run =<< execParser opts
@@ -54,28 +41,33 @@ run :: Args -> IO ()
 run TUI = uiMain
 run (CLI bpm pattern) = cli bpm pattern
 
-patternToMetronome :: Int -> String -> Metronome []
+patternToMetronome :: MonadFail m => Int -> String -> m (Metronome [])
 patternToMetronome bpm s =
-      Metronome bpm ((\w -> (toBeat $ fmap charToBeat w, False)) <$> words s) False
- where toBeat [Accent] = Q.Always Accent
-       toBeat [Beat] = Q.Always Beat
-       toBeat (x:xs) = Q.Always (E $ x :| xs)
-       toBeat [] = error "empty pattern word"
+  Metronome bpm <$> traverse handleWord (words s) <*> pure False
 
-charToBeat :: Char -> BeatSoundNoCompound
-charToBeat 'A' = Accent
-charToBeat 'B' = Beat
-charToBeat 'x' = Rest
-charToBeat _ = error "unknown char in pattern"
+toBeat :: [BeatSoundNoCompound] -> Q.Q BeatSound
+toBeat [Accent] = Q.Always Accent
+toBeat [Beat] = Q.Always Beat
+toBeat (x:xs) = Q.Always (E $ x :| xs)
+toBeat [] = error "empty pattern word"
+
+handleWord :: MonadFail m => [Char] -> m (Q.Q BeatSound, Bool)
+handleWord xs = do
+  beats <- traverse charToBeat xs
+  pure (toBeat beats, False)
+
+charToBeat :: MonadFail m => Char -> m BeatSoundNoCompound
+charToBeat 'A' = pure Accent
+charToBeat 'B' = pure Beat
+charToBeat 'x' = pure Rest
+charToBeat _ = fail "unknown char in pattern"
 
 cli :: Int -> String -> IO ()
 cli bpm pattern = do
   tid <- myThreadId
   playback <- initPlayback
-
-  ref <- newIORef (patternToMetronome bpm pattern)
-  _stop <- startMetronome playback ref $ \(bs, idx) -> 
-    do 
+  ref <- newIORef =<< patternToMetronome bpm pattern
+  _stop <- startMetronome playback ref $ \(bs, idx) -> do 
        if idx == 0
           then do
             clearFromCursorToLineBeginning
@@ -101,5 +93,4 @@ cli bpm pattern = do
 
   threadDelay 1000000000
   quitPlayback playback
-
 
