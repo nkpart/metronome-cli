@@ -17,7 +17,8 @@ import Graphics.Vty
   )
 import Brick (EventM, BrickEvent(AppEvent, MouseUp, VtyEvent))
 import Brick.Types (handleEventLensed)
-import Brick.Widgets.List (handleListEvent)
+import Brick.Widgets.List (handleListEvent, GenericList)
+import qualified Data.Vector as V
 
 newtype AppEvent
   = Beep Int
@@ -29,7 +30,7 @@ data Name
   | U
   deriving (Eq, Show, Ord)
 
-handleEvent :: Ord n => Metronome n -> BrickEvent Name AppEvent -> EventM n (Metronome n)
+handleEvent :: Ord n => Metronome (GenericList n V.Vector) -> BrickEvent Name AppEvent -> EventM n (Metronome (GenericList n V.Vector))
 handleEvent s e = case e of
   MouseUp (MinusBox n) (Just BLeft) _ -> pure $ modifyBpm (\x -> x - n) s
   MouseUp (PlusBox n) (Just BLeft) _ -> pure $ modifyBpm (+ n) s

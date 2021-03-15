@@ -10,6 +10,10 @@ data Q a =
    Always a | Sometimes Float a
    deriving (Eq, Show, Functor, Traversable, Foldable, Read)
 
+qOption :: Q p -> p
+qOption (Always a) = a
+qOption (Sometimes _ a) = a
+
 setChance :: Float -> Q a -> Q a
 setChance f = \case
    Always a -> Sometimes f a

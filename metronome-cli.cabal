@@ -17,10 +17,21 @@ Data-Files:
   digits/8
   digits/9
   digits/0
+  "High Seiko SQ50.wav"
+  "Low Seiko SQ50.wav"
 
 library
   ghc-options:  -O2 -Wall
-  exposed-modules:     Metronome, MyLib, Q, UI, Paths_metronome_cli, Actions, Digits, Config
+  exposed-modules:     
+              Metronome
+            , MyLib
+            , Q
+            , UI
+            , CLI
+            , Paths_metronome_cli
+            , Actions
+            , Digits
+            , Config
   build-depends:       base >=4.13.0.0
                      , sdl2-mixer
                      , sdl2
@@ -30,8 +41,14 @@ library
                      , vty
                      , brick
                      , microlens-platform
+                     , microlens
                      , directory
                      , filepath
+                     , time
+                     , optparse-applicative
+                     , vector
+                     , unix
+                     , ansi-terminal
   default-language:    Haskell2010
   frameworks: CoreAudio
 

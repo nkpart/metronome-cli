@@ -1,6 +1,6 @@
 module Main where
 
-import UI
+import qualified CLI
 
 main :: IO ()
-main = uiMain
+main = CLI.argsMain

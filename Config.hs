@@ -6,10 +6,11 @@ import System.Directory
 import System.FilePath ((</>))
 import Data.Functor ((<&>))
 import Lens.Micro.Platform (view)
-import Data.Foldable (toList)
 import GHC.Exts (fromList)
 import Actions
-import Brick.Widgets.List (list, listElements)
+import Brick.Widgets.List (list, GenericList)
+import qualified Data.Vector as V
+import Lens.Micro ((^..))
 
 configDirectory :: IO FilePath
 configDirectory = getUserDocumentsDirectory <&> (</> ".config/metronome-cli")
@@ -22,7 +23,7 @@ data Conf = Conf {
    _confBeats :: [(Q BeatSound, Bool)]
  } deriving (Eq, Show, Read)
 
-readConfig :: IO (Metronome Name)
+readConfig :: IO (Metronome (GenericList Name V.Vector))
 readConfig = do
     resolvedConfigDir <- configDirectory
     hasConf <- doesFileExist (resolvedConfigDir </> configFile)
@@ -32,8 +33,8 @@ readConfig = do
     let initialState = Metronome (_confBpm conf) (list U (fromList $ _confBeats conf) 10) False
     pure initialState
 
-writeConfig :: Metronome n -> IO ()
+writeConfig :: Traversable f => Metronome f -> IO ()
 writeConfig finalState = do
   resolvedConfigDir <- configDirectory
   createDirectoryIfMissing True resolvedConfigDir
-  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (toList $ listElements $ view metronomeBeats finalState))
+  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (finalState ^.. metronomeBeats . traverse))

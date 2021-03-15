@@ -28,7 +28,7 @@ import Brick.BChan (newBChan, writeBChan)
 import Brick.Util (bg)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (hCenter)
-import Brick.Widgets.List (listSelectedAttr, renderListWithIndex)
+import Brick.Widgets.List (listSelectedAttr, renderListWithIndex, GenericList)
 import Lens.Micro.Platform (view)
 import Control.Monad (when)
 import Actions
@@ -48,21 +48,19 @@ import Metronome
     metronomeBeats,
     metronomeBpm,
   )
-import MyLib (startMetronome)
-import Paths_metronome_cli (getDataFileName)
+import MyLib (startMetronome, initPlayback, quitPlayback)
 import Q (Q (Always, Sometimes))
 import Text.Printf (printf)
-import qualified SDL
-import qualified SDL.Mixer as Mixer
 import qualified Digits
 import Config
 import Brick.Main (continue, halt)
-
-clickTrackFile :: IO FilePath
-clickTrackFile = getDataFileName "157-click1.wav"
+import qualified Data.Vector as V
 
 uiMain :: IO ()
 uiMain = do
+
+  playback <- initPlayback
+
   initialState <- readConfig
   rr <- newIORef initialState
   digits <- Digits.loadDigits
@@ -81,13 +79,10 @@ uiMain = do
             appAttrMap = \_s -> attrMap defAttr styles
           }
 
-  SDL.initialize ([SDL.InitAudio] :: [SDL.InitFlag])
-  Mixer.initialize ([Mixer.InitMP3]  :: [ Mixer.InitFlag ])
-  Mixer.openAudio Mixer.defaultAudio 256
-  clickTrack <- Mixer.load =<< clickTrackFile
-
   eventChan <- Brick.BChan.newBChan 10
-  _stop <- startMetronome clickTrack rr (writeBChan eventChan . Beep)
+
+  _stop <- startMetronome playback rr (writeBChan eventChan . Beep . snd)
+
   let buildVty = mkVty defaultConfig
   initialVty <- buildVty
   let output = outputIface initialVty
@@ -102,14 +97,11 @@ uiMain = do
       app
       initialState
 
-  Mixer.free clickTrack
-  Mixer.closeAudio
-  Mixer.quit
-  SDL.quit
-
   writeConfig finalState
+  quitPlayback playback
 
-drawUI :: [(Int, String)] -> Metronome Name -> [Widget Name]
+
+drawUI :: [(Int, String)] -> Metronome (GenericList Name V.Vector) -> [Widget Name]
 drawUI digits s =
   [       bpmDisplay
       <=> (minus5 <+> minus1 <+> plus1 <+> plus5)
