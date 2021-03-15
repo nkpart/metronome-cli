@@ -2,12 +2,11 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 module CLI where
 
 import Options.Applicative
 import UI
-import MyLib
+import Playback
 import System.Exit
 import System.Posix.Signals
 import Control.Concurrent

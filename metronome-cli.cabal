@@ -24,7 +24,7 @@ library
   ghc-options:  -O2 -Wall
   exposed-modules:     
               Metronome
-            , MyLib
+            , Playback
             , Q
             , UI
             , CLI

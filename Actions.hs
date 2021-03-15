@@ -1,8 +1,5 @@
 module Actions (Name(..), handleEvent, AppEvent(..)) where
 
-
-
-
 import Metronome
     ( addBeat,
       changeProbSelected,

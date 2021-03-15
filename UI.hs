@@ -48,7 +48,7 @@ import Metronome
     metronomeBeats,
     metronomeBpm, compose, UIMetronome
   )
-import MyLib (startMetronome, initPlayback, quitPlayback)
+import Playback (startMetronome, initPlayback, quitPlayback)
 import Q (Q (Always, Sometimes))
 import Text.Printf (printf)
 import qualified Digits

@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-module MyLib where
+module Playback where
 
 import Control.Monad (forever )
 import Control.Concurrent.Async (cancel,  async )
@@ -56,7 +56,8 @@ startMetronome pb ref beeping = do
      -- TODO, might need an InitLoopState which has no last ticks
      tickVar <- newIORef (LoopState startTicks (startTicks - 100))
      xs <-
-        async $ forever $ do
+        async $ 
+          forever $ do
            met <- readIORef ref
            LoopState patternStartTicks' lastTicks' <- readIORef tickVar
            thisTicks' <- fromIntegral <$> SDL.ticks
@@ -71,8 +72,10 @@ startMetronome pb ref beeping = do
 
            let thisPatternOffset = thisTicks' - newPatternStartTicks
                lastPatternOffset = lastTicks' - newPatternStartTicks
+
                thisBeat = findBeatAt thisPatternOffset met
                lastBeat = findBeatAt lastPatternOffset met
+
            if thisBeat /= lastBeat
               then for_ thisBeat $ \(x,n) -> do
                       _ <- async (runQ g (maybe empty (play pb)) x)
@@ -80,7 +83,6 @@ startMetronome pb ref beeping = do
               else pure () -- Do nothing if we are still in the same beat window
 
            writeIORef tickVar (LoopState newPatternStartTicks thisTicks')
-
            SDL.delay 5 -- This needs to kind of line up with the window, to make sure we don't tick over a beat
            pure ()
      pure $ cancel xs
@@ -124,11 +126,11 @@ expandCompound beatMillis (q,bt) = case qOption q of
                           Beat -> [(Beat <$ q,bt)]
                           Accent -> [(Accent <$ q,bt)]
                           Rest -> [(Rest <$ q,bt)]
-                          E xs -> fmap (xxx bt q (length xs) beatMillis) $ zip [(0::Int)..] $ toList xs
+                          E xs -> fmap (xxx bt q (length xs) beatMillis) . zip [(0::Int)..] $ toList xs
 
 xxx :: Ticks -> Q BeatSound -> Int -> Ticks -> (Int, BeatSoundNoCompound) -> (Q BeatSoundNoCompound, Ticks)
 xxx baseTime baseQ beatBeats beatMillis (idx, newSound) =
-  (newSound <$ baseQ, baseTime + (Ticks idx * (beatMillis `div` Ticks beatBeats)) )
+  (newSound <$ baseQ, baseTime + (Ticks idx * (beatMillis `div` Ticks beatBeats)))
 
 play :: Playback -> BeatSoundNoCompound -> IO ()
 play (Playback beatTrack accentTrack) b = 
