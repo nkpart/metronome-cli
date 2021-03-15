@@ -4,7 +4,7 @@ module MyLib where
 import Control.Monad (forever )
 import Control.Concurrent.Async (cancel,  async )
 import System.Random.MWC ( createSystemRandom )
-import Q (Q, runQ )
+import Q (Q, runQ, qOption )
 import Control.Applicative (Alternative(empty))
 import Data.IORef (IORef, readIORef, newIORef, writeIORef)
 import Metronome
@@ -13,6 +13,8 @@ import Paths_metronome_cli (getDataFileName)
 import qualified SDL.Mixer as Mixer
 import qualified SDL
 import Data.Foldable (find, for_)
+import Data.Void (absurd)
+import Data.List.NonEmpty (toList)
 
 data LoopState = LoopState {
      loopStatePatternStartTicks :: Int,
@@ -45,7 +47,7 @@ window :: Int
 window = 10 -- What should this be, guessing 10ms is okay
 
 
-startMetronome :: Traversable n => Playback -> IORef (Metronome n) -> ((Q BeatSound, Int) -> IO ()) -> IO (IO ())
+startMetronome :: Traversable n => Playback -> IORef (Metronome n) -> ((Q BeatSoundNoCompound, Int) -> IO ()) -> IO (IO ())
 startMetronome pb ref beeping = do
      g <- createSystemRandom
      startTicks <- fromIntegral <$> SDL.ticks
@@ -56,6 +58,7 @@ startMetronome pb ref beeping = do
            met <- readIORef ref
            LoopState patternStartTicks' lastTicks' <- readIORef tickVar
            thisTicks' <- fromIntegral <$> SDL.ticks
+           -- Check if we are starting the pattern over again
            newPatternStartTicks <-
                  -- this needs to acocunt for window
                  -- If we are at 1993ms, and the next pattern starts at 2000, that's legit
@@ -66,7 +69,6 @@ startMetronome pb ref beeping = do
 
            let thisPatternOffset = thisTicks' - newPatternStartTicks
                lastPatternOffset = lastTicks' - newPatternStartTicks
-
                thisBeat = findBeatAt thisPatternOffset met
                lastBeat = findBeatAt lastPatternOffset met
            if thisBeat /= lastBeat
@@ -84,7 +86,7 @@ startMetronome pb ref beeping = do
      pure $ cancel xs
 
 -- work in ints so negative numbers can happen
-findBeatAt :: Traversable n => Int -> Metronome n -> Maybe (Q BeatSound, Int)
+findBeatAt :: Traversable n => Int -> Metronome n -> Maybe (Q BeatSoundNoCompound, Int)
 findBeatAt offset met =
    let bts = beatTimes met
        thisGuy (_, (_, x)) = offset > (fromIntegral x - fromIntegral window) && offset < fromIntegral x + window
@@ -96,7 +98,7 @@ patternSizeMillis m =
        numBeats = view metronomeBeats m & length
     in fromIntegral $ (60000 `div` bpm) * numBeats
 
-beatTimes :: Traversable n => Metronome n -> [(Q BeatSound, Int)]
+beatTimes :: Traversable n => Metronome n -> [(Q BeatSoundNoCompound, Int)]
 beatTimes m =
   let bpm = view metronomeBpm m
       beatMillis = 60000 `div` bpm
@@ -105,11 +107,24 @@ beatTimes m =
       beatTimes' = fmap (fromIntegral . (* beatMillis)) [0 .. (numBeats - 1)]
    in if numBeats == 0 
          then error "No beats?" 
-         else zip (fmap fst beats) beatTimes'
+         else zip (fmap fst beats) beatTimes' >>= expandCompound beatMillis
 
-play :: Playback -> BeatSound -> IO ()
+expandCompound :: Int -> (Q BeatSound, Int) -> [(Q BeatSoundNoCompound, Int)]
+expandCompound beatMillis (q,bt) = case qOption q of
+                          E xs -> fmap (xxx bt q (length xs) beatMillis) $ zip [(0::Int)..] $ toList xs
+                          Beat -> [(Beat <$ q,bt)]
+                          Accent -> [(Accent <$ q,bt)]
+                          Rest -> [(Rest <$ q,bt)]
+
+xxx :: Int -> Q BeatSound -> Int -> Int -> (Int, BeatSoundNoCompound) -> (Q BeatSoundNoCompound, Int)
+xxx baseTime baseQ beatBeats beatMillis (idx, newSound) =
+  (newSound <$ baseQ, baseTime + (idx * (beatMillis `div` beatBeats)) )
+
+play :: Playback -> BeatSoundNoCompound -> IO ()
 play (Playback beatTrack accentTrack) b = 
    case b of
         Accent -> Mixer.play accentTrack
         Beat -> Mixer.play beatTrack
+        Rest -> pure ()
+        E v -> absurd v
 

@@ -12,6 +12,8 @@ import qualified Q
 import Data.IORef
 import System.Console.ANSI
 import System.IO (hFlush, stdout)
+import Data.Void (absurd)
+import Data.List.NonEmpty (NonEmpty ((:|)))
 
 data Args = TUI
           | CLI Int String
@@ -54,10 +56,17 @@ run (CLI bpm pattern) = cli bpm pattern
 
 patternToMetronome :: Int -> String -> Metronome []
 patternToMetronome bpm s =
-      Metronome bpm ((\w -> (toBeat w, False)) <$> words s) False
- where toBeat "A" = Q.Always Accent
-       toBeat "B" = Q.Always Beat
-       toBeat _ = error "beat string wat"
+      Metronome bpm ((\w -> (toBeat $ fmap charToBeat w, False)) <$> words s) False
+ where toBeat [Accent] = Q.Always Accent
+       toBeat [Beat] = Q.Always Beat
+       toBeat (x:xs) = Q.Always (E $ x :| xs)
+       toBeat [] = error "empty pattern word"
+
+charToBeat :: Char -> BeatSoundNoCompound
+charToBeat 'A' = Accent
+charToBeat 'B' = Beat
+charToBeat 'x' = Rest
+charToBeat _ = error "unknown char in pattern"
 
 cli :: Int -> String -> IO ()
 cli bpm pattern = do
@@ -74,11 +83,15 @@ cli bpm pattern = do
             putStr $ case Q.qOption bs of
               Accent -> "A "
               Beat -> "B "
+              Rest -> "x "
+              E v -> absurd v
             hFlush stdout
           else do
             putStr $ case Q.qOption bs of
               Accent -> "A "
               Beat -> "B "
+              Rest -> "x "
+              E v -> absurd v
             hFlush stdout
        
   _ <- installHandler keyboardSignal (Catch (do

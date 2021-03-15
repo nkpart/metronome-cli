@@ -12,6 +12,8 @@ import Lens.Micro.Internal
 import Brick.Widgets.List (GenericList(listSelected), listRemove, listReverse, listElementsL, List)
 import Q (adjustChance, Q(Always))
 import Data.Vector as V
+import Data.List.NonEmpty
+import Data.Void (Void, absurd)
 
 data Metronome f = Metronome {
      _metronomeBpm :: Int
@@ -21,7 +23,9 @@ data Metronome f = Metronome {
 
 deriving instance (Show (f (Q BeatSound, Bool))) => Show (Metronome f)
 
-data BeatSound = Accent | Beat deriving (Eq, Show, Read)
+data B x = Accent | Beat | Rest | E x deriving (Eq, Show, Read)
+type BeatSoundNoCompound = B Void 
+type BeatSound = B (NonEmpty BeatSoundNoCompound)
 
 metronomeBpm :: Lens' (Metronome n) Int
 metronomeBpm = lens _metronomeBpm (\m b -> m { _metronomeBpm = b})
@@ -70,6 +74,11 @@ setShouldQuit = set metronomeShouldQuit True
 toggleAccent :: BeatSound -> BeatSound
 toggleAccent Accent = Beat
 toggleAccent Beat = Accent
+toggleAccent Rest = Rest
+toggleAccent (E (Accent:|_)) = Beat
+toggleAccent (E (Beat:|_)) = Accent
+toggleAccent (E (Rest:|_)) = Rest
+toggleAccent (E (E v :| _ )) = absurd v
 
 accent :: Q BeatSound
 accent = Always Accent
