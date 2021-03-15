@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -15,6 +16,7 @@ import Data.Vector as V
 import Data.List.NonEmpty
 import Data.Void (Void, absurd)
 import Data.Functor.Compose (Compose(..))
+import GHC.Generics (Generic, Generic1)
 
 data Metronome f = Metronome {
      _metronomeBpm :: Int
@@ -28,6 +30,8 @@ type WithBool = (,) Bool
 type UIMetronome n = Metronome (Compose (GenericList n Vector) WithBool)
 
 deriving instance (Show (f (Q BeatSound))) => Show (Metronome f)
+
+deriving instance (Generic1 f) => Generic (Metronome f)
 
 data B x = Accent | Beat | Rest | E x deriving (Eq, Show, Read)
 type BeatSoundNoCompound = B Void 

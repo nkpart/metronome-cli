@@ -1,14 +1,16 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE LambdaCase #-}
 module Q where
 
 import System.Random.MWC
+import GHC.Generics (Generic)
 
 -- Q values can be extracted sometimes
 data Q a =
    Always a | Sometimes Float a
-   deriving (Eq, Show, Functor, Traversable, Foldable, Read)
+   deriving (Eq, Show, Functor, Traversable, Foldable, Read, Generic)
 
 qOption :: Q p -> p
 qOption (Always a) = a
