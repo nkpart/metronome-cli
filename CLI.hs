@@ -23,9 +23,11 @@ import Data.Foldable (for_)
 import System.FSNotify
 import qualified Data.Text.IO as TIO
 import System.Directory (canonicalizePath)
+import Recording
 
 data Args = TUI
           | CLI (Maybe FilePath) Int String
+          | Rec
 
 cliArgs :: Parser Args
 cliArgs = 
@@ -35,6 +37,7 @@ args :: Parser Args
 args = subparser (
               command "tui" (info (pure TUI) (progDesc "Terminal UI"))
            <> command "cli" (info cliArgs (progDesc "Supply a pattern"))
+           <> command "recording" (info (pure Rec) (progDesc "test recording"))
            )
 
 argsMain :: IO ()
@@ -47,6 +50,7 @@ argsMain = run =<< execParser opts
 
 run :: Args -> IO ()
 run TUI = uiMain
+run Rec = recording
 run (CLI watchMe bpm pattern) = cli watchMe bpm pattern
 
 patternToMetronome :: MonadFail m => Int -> String -> m (Metronome [])

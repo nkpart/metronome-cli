@@ -23,15 +23,16 @@ Data-Files:
 library
   ghc-options:  -O2 -Wall
   exposed-modules:     
-              Metronome
+              Actions
+            , CLI
+            , Config
+            , Digits
+            , Metronome
+            , Paths_metronome_cli
             , Playback
             , Q
+            , Recording
             , UI
-            , CLI
-            , Paths_metronome_cli
-            , Actions
-            , Digits
-            , Config
   build-depends:       base >=4.13.0.0
                      , sdl2-mixer
                      , sdl2
@@ -52,6 +53,8 @@ library
                      , fsnotify
                      , tomland
                      , text
+                     , hsndfile
+                     , hsndfile-vector
   default-language:    Haskell2010
   frameworks: CoreAudio
 
