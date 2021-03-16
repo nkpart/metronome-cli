@@ -11,6 +11,7 @@ import Sound.File.Sndfile as SF
 import Sound.File.Sndfile.Buffer.Vector 
 import Control.Monad (unless)
 import System.IO
+import qualified SDL.Mixer as Mixer
 
 configSampleRate :: Num a => a
 configSampleRate = 48000
@@ -25,6 +26,8 @@ recording :: IO ()
 recording =
   do
     SDL.initialize [SDL.InitAudio]
+    Mixer.initialize ([Mixer.InitMP3]  :: [ Mixer.InitFlag ])
+    Mixer.openAudio Mixer.defaultAudio 256
     Just (recDevice:_) <- fmap toList <$> SDLA.getAudioDeviceNames SDLA.ForCapture
 
     buffersRef <- newIORef []
@@ -55,7 +58,12 @@ recording =
                  bufs <- readIORef buffersRef
                  let forUse = lastN (configSampleRate * configCaptureSeconds) bufs
                  putStrLn "\nCaptured"
-                 writeBuffersToWav ("out-" <> show n <> ".wav") forUse
+                 let fp = "out-" <> show n <> ".wav"
+                 writeBuffersToWav fp forUse
+                 justDid <- Mixer.load fp
+                 Mixer.play justDid 
+                 -- This seems a bad way to do this.
+                 Mixer.whenChannelFinished $ \_ -> Mixer.free justDid
                  go (n + 1)
               'q' -> pure ()
               _ -> go n
@@ -63,6 +71,9 @@ recording =
     go (0 :: Int) 
 
     SDLA.closeAudioDevice recDeviceId
+    Mixer.closeAudio
+    Mixer.quit
+    SDL.quit
     pure ()
 
 lastN :: (Foldable t, MV.Storable a) => Int -> t (VS.Vector a) -> [VS.Vector a]
