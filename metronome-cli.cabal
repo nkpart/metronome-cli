@@ -22,6 +22,7 @@ Data-Files:
 
 library
   ghc-options:  -O2 -Wall
+  hs-source-dirs: src
   exposed-modules:     
               Actions
             , CLI

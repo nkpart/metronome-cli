@@ -47,7 +47,6 @@ recording =
 
     putStrLn "Waiting to capture some stuff"
 
-    -- Makes getChar return on key stroke, rather than wait for newline/enter
     hSetBuffering stdin NoBuffering
 
     let go n = 
