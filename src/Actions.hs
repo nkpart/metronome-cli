@@ -8,7 +8,7 @@ import Metronome
       setAccent,
       setPlayed,
       toggleAccentOnSelected,
-      setShouldQuit, metronomeBeats, UIMetronome, compose )
+      setShouldQuit, metronomeBeats, UIMetronome, compose, BPM )
 import Graphics.Vty
   ( Button (BLeft),
     Event (EvKey),
@@ -23,8 +23,8 @@ newtype AppEvent
   = Beep Int
 
 data Name
-  = MinusBox Int
-  | PlusBox Int
+  = MinusBox BPM
+  | PlusBox BPM
   | ClickBeat Int
   | U
   deriving (Eq, Show, Ord)

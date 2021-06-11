@@ -30,11 +30,11 @@ readConfig = do
     conf <- if hasConf
        then read <$> readFile (resolvedConfigDir </> configFile)
        else pure (Conf 114 [(False, Always Accent), (False, beat), (False, beat), (False, beat)])
-    let initialState = Metronome (_confBpm conf) (Compose $ list U (fromList $ _confBeats conf) 10) False
+    let initialState = Metronome (BPM $ _confBpm conf) (Compose $ list U (fromList $ _confBeats conf) 10) False
     pure initialState
 
 writeConfig :: UIMetronome Name -> IO ()
 writeConfig finalState = do
   resolvedConfigDir <- configDirectory
   createDirectoryIfMissing True resolvedConfigDir
-  writeFile (resolvedConfigDir </> configFile) (show $ Conf (view metronomeBpm finalState) (finalState ^.. metronomeBeats . compose . traverse))
+  writeFile (resolvedConfigDir </> configFile) (show $ Conf (unBPM $ view metronomeBpm finalState) (finalState ^.. metronomeBeats . compose . traverse))

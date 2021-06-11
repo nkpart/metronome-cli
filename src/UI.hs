@@ -36,7 +36,8 @@ import Actions
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.IORef (newIORef, writeIORef)
 import Graphics.Vty
-  ( Mode (Mouse),
+  ( 
+    Mode (Mouse),
     Output (setMode, supportsMode),
     defaultConfig,
     mkVty,
@@ -44,9 +45,10 @@ import Graphics.Vty
   )
 import Graphics.Vty.Attributes (Attr, blue, defAttr)
 import Metronome
-  ( Metronome (..),
+  (
+    Metronome (..),
     metronomeBeats,
-    metronomeBpm, compose, UIMetronome
+    metronomeBpm, compose, UIMetronome, BPM, unBPM
   )
 import Playback (startMetronome, initPlayback, quitPlayback)
 import Q (Q (Always, Sometimes))
@@ -85,7 +87,7 @@ uiMain = do
   let buildVty = mkVty defaultConfig
   initialVty <- buildVty
   let output = outputIface initialVty
-  when (supportsMode output Mouse) $ do
+  when (supportsMode output Mouse) $
     setMode output Mouse True
 
   finalState <-
@@ -98,7 +100,6 @@ uiMain = do
 
   writeConfig finalState
   quitPlayback playback
-
 
 drawUI :: [(Int, String)] -> UIMetronome Name -> [Widget Name]
 drawUI digits s =
@@ -116,14 +117,14 @@ drawUI digits s =
       clickable (ClickBeat idx) $
         hCenter $
           str " "
-            <=> ((if thisClick then txt "> " else txt "") <+> str (showBeat b) <+> (if thisClick then txt " <" else txt ""))
+            <=> (txt (if thisClick then "> " else "") <+> str (showBeat b) <+> txt (if thisClick then " <" else ""))
             <=> str " "
     showBeat (Always b) = show b
     showBeat (Sometimes f b) = show b <> " ?? " <> printf "%2.2f" f
 
-displayBpm :: [(Int, String)] -> Int -> Widget n
+displayBpm :: [(Int, String)] -> BPM -> Widget n
 displayBpm digits =
-   foldl1 (<+>) . fmap str . Digits.render digits
+   foldl1 (<+>) . fmap str . Digits.render digits . unBPM
 
 -- Styles
 

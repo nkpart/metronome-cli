@@ -55,7 +55,7 @@ run (CLI watchMe bpm pattern) = cli watchMe bpm pattern
 
 patternToMetronome :: MonadFail m => Int -> String -> m (Metronome [])
 patternToMetronome bpm s =
-  Metronome bpm <$> traverse handleWord (words s) <*> pure False
+  Metronome (BPM bpm) <$> traverse handleWord (words s) <*> pure False
 
 toBeat :: MonadFail m => [BeatSoundNoCompound] -> m (Q.Q BeatSound)
 toBeat [Accent] = pure $ Q.Always Accent
@@ -78,9 +78,6 @@ cli watchConfig bpm pattern = withManager $ \mgr -> do
   tid <- myThreadId
   playback <- initPlayback
   ref <- newIORef =<< patternToMetronome bpm pattern
-
-  putStrLn "Starting"
-
   for_ watchConfig $ \fp -> do
      initWatchFile fp bpm pattern
      _ <- runWatch mgr ref =<< canonicalizePath fp

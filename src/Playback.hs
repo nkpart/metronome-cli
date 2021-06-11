@@ -14,8 +14,8 @@ import Paths_metronome_cli (getDataFileName)
 import qualified SDL.Mixer as Mixer
 import qualified SDL
 import Data.Foldable (find, for_)
-import Data.Void (absurd)
-import Data.List.NonEmpty (toList)
+import Data.List.NonEmpty (toList, NonEmpty)
+import Control.Monad.IO.Class (MonadIO)
 
 data LoopState = LoopState {
      loopStatePatternStartTicks :: Ticks,
@@ -52,13 +52,19 @@ newtype Ticks = Ticks Int deriving (Eq, Show, Ord, Num, Real, Integral, Enum)
 startMetronome :: Traversable n => Playback -> IORef (Metronome n) -> ((Q BeatSoundNoCompound, Int) -> IO ()) -> IO (IO ())
 startMetronome pb ref beeping = do
      g <- createSystemRandom
+     startMetronome2 ref $ \(a,_,b) -> do
+       _ <- async (runQ g (maybe empty (play pb)) a)
+       beeping (a,b)
+
+startMetronome2 :: Traversable n => IORef (Metronome n) -> ((Q BeatSoundNoCompound, Ticks, Int) -> IO ()) -> IO (IO ())
+startMetronome2 metronomeDefinition onBeep = do
      startTicks <- Ticks . fromIntegral <$> SDL.ticks
      -- TODO, might need an InitLoopState which has no last ticks
      tickVar <- newIORef (LoopState startTicks (startTicks - 100))
      xs <-
         async $ 
           forever $ do
-           met <- readIORef ref
+           met <- readIORef metronomeDefinition
            LoopState patternStartTicks' lastTicks' <- readIORef tickVar
            thisTicks' <- fromIntegral <$> SDL.ticks
            -- Check if we are starting the pattern over again
@@ -77,9 +83,7 @@ startMetronome pb ref beeping = do
                lastBeat = findBeatAt lastPatternOffset met
 
            if thisBeat /= lastBeat
-              then for_ thisBeat $ \(x,n) -> do
-                      _ <- async (runQ g (maybe empty (play pb)) x)
-                      beeping (x,n)
+              then for_ thisBeat $ \(n,(a,x)) -> onBeep (x,a,n)
               else pure () -- Do nothing if we are still in the same beat window
 
            writeIORef tickVar (LoopState newPatternStartTicks thisTicks')
@@ -88,55 +92,52 @@ startMetronome pb ref beeping = do
      pure $ cancel xs
 
 -- work in ints so negative numbers can happen
-findBeatAt :: Traversable n => Ticks -> Metronome n -> Maybe (Q BeatSoundNoCompound, Int)
-findBeatAt offset met =
-   let bts = beatTimes met
-       isThisBeat x = 
-         isNearTo offset (snd . snd $ x)
-    in (\(a,(b, _)) -> (b,a)) <$> find isThisBeat (indexed bts) 
-
-indexed :: [b] -> [(Int, b)]
-indexed = zip [0..]
+findBeatAt :: (Num a, Enum a, Traversable n) => Ticks -> Metronome n -> Maybe (a, (Ticks, Q BeatSoundNoCompound))
+findBeatAt offset =
+   let isThisBeat x = 
+         isNearTo offset (fst . snd $ x)
+    in find isThisBeat . indexed . beatTimes
 
 isNearTo :: Ticks -> Ticks -> Bool
 isNearTo offset pos =  
-         offset > (pos - window) && 
-         offset < pos + window
+  let lb = pos - window
+      ub = pos + window
+   in offset > lb && offset < ub
 
 metronomePatternSize :: Foldable n => Metronome n -> Ticks
 metronomePatternSize m = 
    let bpm = view metronomeBpm m
        numBeats = view metronomeBeats m & length
-    in Ticks . fromIntegral $ (60000 `div` bpm) * numBeats
+    in Ticks . fromIntegral $ beatMillis bpm * numBeats
 
-beatTimes :: Traversable n => Metronome n -> [(Q BeatSoundNoCompound, Ticks)]
+
+beatMillis :: BPM -> Int
+beatMillis (BPM n) = 60000 `div` n
+
+beatTimes :: Traversable n => Metronome n -> [(Ticks, Q BeatSoundNoCompound)]
 beatTimes m =
   let bpm = view metronomeBpm m
-      beatMillis = Ticks $ 60000 `div` bpm
       beats = m ^.. metronomeBeats . traverse
-      numBeats = beats & length
-      beatTimes' = fmap ((* beatMillis) . fromIntegral) [0 .. (numBeats - 1)]
-   in if numBeats == 0 
+      beatTimes' = fmap (* Ticks (beatMillis bpm)) [0 .. ]
+   in if null beats
          then error "No beats?" 
          -- Produce each outer beat, then expand any compounds
-         else zip beats beatTimes' >>= expandCompound beatMillis
+         else zip beatTimes' beats >>= expandCompound (Ticks (beatMillis bpm))
 
-expandCompound :: Ticks -> (Q BeatSound, Ticks) -> [(Q BeatSoundNoCompound, Ticks)]
-expandCompound beatMillis (q,bt) = case qOption q of
-                          Beat -> [(Beat <$ q,bt)]
-                          Accent -> [(Accent <$ q,bt)]
-                          Rest -> [(Rest <$ q,bt)]
-                          E xs -> fmap (xxx bt q (length xs) beatMillis) . zip [(0::Int)..] $ toList xs
+expandCompound :: Ticks -> (Ticks, Q (B (NonEmpty (B x)))) -> [(Ticks, Q (B x))]
+expandCompound bm (bt, q) = fmap (over _2 (<$ q)) $ case qOption q of
+                          Beat -> pure (bt, Beat)
+                          Accent -> pure (bt, Accent)
+                          Rest -> pure (bt, Rest)
+                          E xs -> fmap (over _1 (\x -> bt + x * (bm `div` Ticks (length xs)))) . indexed . toList $ xs
 
-xxx :: Ticks -> Q BeatSound -> Int -> Ticks -> (Int, BeatSoundNoCompound) -> (Q BeatSoundNoCompound, Ticks)
-xxx baseTime baseQ beatBeats beatMillis (idx, newSound) =
-  (newSound <$ baseQ, baseTime + (Ticks idx * (beatMillis `div` Ticks beatBeats)))
-
-play :: Playback -> BeatSoundNoCompound -> IO ()
+play :: MonadIO m => Playback -> B x -> m ()
 play (Playback beatTrack accentTrack) b = 
    case b of
         Accent -> Mixer.play accentTrack
         Beat -> Mixer.play beatTrack
         Rest -> pure ()
-        E v -> absurd v
+        E _ -> pure ()
 
+indexed :: (Num a, Enum a) => [b] -> [(a, b)]
+indexed = zip [0..]

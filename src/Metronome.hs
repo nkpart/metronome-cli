@@ -3,6 +3,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# language OverloadedLists #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -18,8 +20,12 @@ import Data.Void (Void, absurd)
 import Data.Functor.Compose (Compose(..))
 import GHC.Generics (Generic, Generic1)
 
+newtype BPM = BPM { unBPM :: Int } 
+ deriving newtype Read
+ deriving (Enum, Ord, Eq, Num, Show)
+
 data Metronome f = Metronome {
-     _metronomeBpm :: Int
+     _metronomeBpm :: BPM
    , _metronomeBeats :: f (Q BeatSound) 
    , _metronomeShouldQuit :: Bool
    }
@@ -37,7 +43,7 @@ data B x = Accent | Beat | Rest | E x deriving (Eq, Show, Read)
 type BeatSoundNoCompound = B Void 
 type BeatSound = B (NonEmpty BeatSoundNoCompound)
 
-metronomeBpm :: Lens' (Metronome n) Int
+metronomeBpm :: Lens' (Metronome n) BPM
 metronomeBpm = lens _metronomeBpm (\m b -> m { _metronomeBpm = b})
 
 metronomeBeats :: Lens' (Metronome f) (f (Q BeatSound))
@@ -46,7 +52,7 @@ metronomeBeats = lens _metronomeBeats (\m b -> m { _metronomeBeats = b})
 metronomeShouldQuit :: Lens' (Metronome n) Bool
 metronomeShouldQuit = lens _metronomeShouldQuit (\m b -> m { _metronomeShouldQuit = b})
 
-modifyBpm :: (Int -> Int) -> Metronome n -> Metronome n
+modifyBpm :: (BPM -> BPM) -> Metronome n -> Metronome n
 modifyBpm = over metronomeBpm
 
 setAccent :: Int -> UIMetronome n -> UIMetronome n

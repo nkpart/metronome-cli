@@ -13,6 +13,7 @@ in {
     name = "dev";
     packages = p: [p.metronome_cli];
     buildInputs = [ pkgs.toilet pkgs.darwin.apple_sdk.frameworks.CoreAudio ];
+    withHoogle = true;
   };
   metronome-cli = hp.metronome_cli;
 }
